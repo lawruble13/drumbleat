@@ -116,26 +116,37 @@ function draw_specs(specs)
 	end
 end
 
-function background()
-	if gw.mode == "game" then
-		cls(6)
-		clip(gw.lx,gw.ty,gw.rx-gw.lx,gw.by-gw.ty)
-		if bg.tiles then
-			for i, c in ipairs(bg.tiles) do
-				if c>0 then
-					local n=5+2*(c%2)+32*(c\2)
-					local t=i-1
-					spr(n,8*(t%8),64-8*(t\8+1),2,2)
+do
+	local anim_frame = 0
+	local anim_dur = stat(8)*8.25
+	function background()
+		if gw.mode == "game" then
+			cls(6)
+			clip(gw.lx,gw.ty,gw.rx-gw.lx,gw.by-gw.ty)
+			if bg.tiles then
+				for i, c in ipairs(bg.tiles) do
+					if c>0 then
+						local n=5+2*(c%2)+32*(c\2)
+						local t=i-1
+						spr(n,8*(t%8),64-8*(t\8+1),2,2)
+					end
 				end
 			end
+			clip()
+		elseif gw.mode == "menu" then
+			cls(10)
+		elseif gw.mode == "anim" then
+			anim_frame += 1
+			if anim_frame > anim_dur then
+				gw.mode = "menu"
+			end
+			cls(10)
+			camera(0,64*(anim_frame/anim_dur-1))
 		end
-		clip()
-	elseif gw.mode == "menu" then
-		cls(10)
+		draw_specs(bg.spr[gw.mode])
 	end
-	draw_specs(bg.spr[gw.mode])
 end
-		
+
 function border()
 	draw_specs(br.spr[gw.mode])
 end
@@ -401,6 +412,7 @@ function init_bg()
 		{0,5,1,3,16,7,0,0},
 		{0,0,8,8,136,0,0,0}
 	}
+	bg.spr.anim=bg.spr.menu
 	bg.tiles={}
 	tile_bg(72)
 	bg.offset=0
@@ -429,6 +441,7 @@ function init_br()
  	{8, 56,1,1,13,5,0,0},
  	{56,56,1,1,15,0,0,0}
  }	
+ br.spr.anim=br.spr.menu
 end
 
 function init_gw()
@@ -443,7 +456,7 @@ function init_gw()
 	gw.platforms={
 		{x=0,y=0,m=0,l=48}
 	}
-	gw.mode="menu"
+	gw.mode="anim"
 	gw.selected=0
 end
 
