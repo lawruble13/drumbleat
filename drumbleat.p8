@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=true
+	debug_info=false
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -18,7 +18,7 @@ function _init()
 	init_br()
 	init_gw()
 	init_pl()
-	test_platforms()
+--	test_platforms()
 	
 	if not debug_info then
 		-- when debugging, game tl,
@@ -41,7 +41,8 @@ function _update60()
 	if not fstep or btnp(4) then
 		if gw.mode == "game" then
 			update_player_speed()
-			move_player(gw)
+			move_player()
+			check_platforms()
 		else
 			update_menu()
 		end
@@ -72,10 +73,11 @@ function _draw()
  	print(" vy: "..pl.vy)
  end
  cursor(1,65)
- print("platforms:")
- for pt in all(gw.platforms) do
- 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
- end
+-- print("platforms:")
+-- for pt in all(gw.platforms) do
+-- 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
+-- end
+-- print(" highest: "..gw.platforms[#gw.platforms]:top())
 end
 -->8
 --lowrez drawing functions
@@ -168,7 +170,7 @@ end
 function set_camera()
 	local h=gw.by-gw.ty
 	if pl.stn and pl.y > 0.4 * h+gw.cy then
-		gw.cy += pl.y-0.4*h
+		gw.cy = pl.y-0.4*h
 	end
 	camera(0,-gw.cy)	
 end
@@ -467,9 +469,9 @@ function init_gw()
 		cx=0,
 		cy=0
 	}
-	gw.platforms={
-		{x=0,y=0,m=0,l=48}
-	}
+	gw.platforms={}
+	gw.platforms[1]=platform_cls:new({l=48})
+	
 	gw.mode="anim"
 	gw.selected=0
 end
@@ -546,6 +548,42 @@ function update_menu()
 		gw.mode = "game"
 	end
 end
+
+function check_platforms()
+	for pt in all(gw.platforms) do
+		if pt:top() < gw.cy - pl.h then
+			del(gw.platforms, pt)
+		end
+	end
+	local num_pt = #gw.platforms
+	local highest = gw.platforms[num_pt]:top()
+	local gww=gw.rx-gw.lx+1
+	while highest < gw.cy + gw.by - gw.ty do
+		local np = platform_cls:new()
+		local m = rnd(1.8)-0.9
+		if m >= 0 then
+			m += 0.1
+		else
+			m -= 0.1
+		end
+		np:setslope(m)
+		if m < 0 then
+			local rx = rnd(gww-pl.w*2)+pl.w
+			local lx = rnd(rx-pl.w)
+			np:setleft(lx)
+			np:setwidth(rx-lx)
+		else
+			local lx = rnd(gww-pl.w*2)+pl.w
+			local rx = rnd(gww-pl.w-lx)+pl.w+lx
+			np:setleft(lx)
+			np:setwidth(rx-lx)
+		end
+		np:setbottom(highest+rnd(20)-10)
+		highest=np:top()
+		add(gw.platforms,np)
+	end
+end
+		
 -->8
 --lowrez debug functions
 function csv_print_file(file, name, item, header, sep)
