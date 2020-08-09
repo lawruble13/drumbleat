@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=false
+	debug_info=true
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -63,6 +63,19 @@ function _draw()
 	end
 	camera(0,0)
  border()
+ if debug_info then
+ 	cursor(65, 0)
+ 	print("player:")
+ 	print(" x : "..pl.x)
+ 	print(" y : "..pl.y)
+ 	print(" vx: "..pl.vx)
+ 	print(" vy: "..pl.vy)
+ end
+ cursor(1,65)
+ print("platforms:")
+ for pt in all(gw.platforms) do
+ 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
+ end
 end
 -->8
 --lowrez drawing functions
@@ -501,23 +514,23 @@ function tile_bg(n)
 end
 
 function test_platforms()
-	gw.platforms[2]=platform_cls.new({
+	gw.platforms[2]=platform_cls:new({
 		x=12,
 		y=10,
 		m=0.6,
 		l=20
 	})
-	gw.platforms[3]=platform_cls.new({
+	gw.platforms[3]=platform_cls:new({
 		y=30,
 		m=-0.4,
 		l=14
 	})
-	gw.platforms[4]=platform_cls.new({
+	gw.platforms[4]=platform_cls:new({
 		y=30,
 		m=1,
 		l=30
 	})
-	gw.platforms[4]:setright(64)
+	gw.platforms[4]:setright(48)
 	gw.platforms[5]={
 		x=20,
 		y=64,
@@ -573,8 +586,8 @@ platform_cls = {
 
 function platform_cls:new(o)
 	o = o or {}
-	setmetatable(o, self)
 	self.__index = self
+	setmetatable(o, self)
 	return o
 end
 
