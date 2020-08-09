@@ -501,29 +501,28 @@ function tile_bg(n)
 end
 
 function test_platforms()
-	gw.platforms[2]={
+	gw.platforms[2]=platform_cls.new({
 		x=12,
 		y=10,
 		m=0.6,
 		l=20
-	}
-	gw.platforms[3]={
-		x=0,
+	})
+	gw.platforms[3]=platform_cls.new({
 		y=30,
 		m=-0.4,
 		l=14
-	}
-	gw.platforms[4]={
+	})
+	gw.platforms[4]=platform_cls.new({
+		y=30,
+		m=1,
+		l=30
+	})
+	gw.platforms[4]:setright(64)
+	gw.platforms[5]={
 		x=20,
 		y=64,
 		m=0.1,
 		l=23
-	}
-	gw.platforms[5]={
-		x=28,
-		y=30,
-		m=1,
-		l=30
 	}
 end
 
@@ -564,13 +563,23 @@ function csv_print (name, item, header, sep)
 	return str
 end
 -->8
+-- platform class
+platform_cls = {
+	x=0,
+	y=0,
+	m=0,
+	l=0
+}
 
-platform_cls = {}
-function platform_cls:new(0)
+function platform_cls:new(o)
 	o = o or {}
 	setmetatable(o, self)
 	self.__index = self
 	return o
+end
+
+function platform_cls:hyp()
+	return sqrt(1+self.m^2)
 end
 
 function platform_cls:left()
@@ -578,22 +587,22 @@ function platform_cls:left()
 end
 
 function platform_cls:width()
-	return self.l/sqrt(1+self.m^2)
+	return self.l/self:hyp()
 end
 
 function platform_cls:height()
-	return self.width()*abs(self.m)
+	return self:width()*abs(self.m)
 end
 
 function platform_cls:right()
-	return self.x + self.width()
+	return self.x + self:width()
 end
 
 function platform_cls:bottom()
 	if self.m >= 0 then
 		return self.y
 	else
-		return self.y-self.height()
+		return self.y-self:height()
 	end
 end
 
@@ -601,14 +610,43 @@ function platform_cls:top()
 	if self.m <= 0 then
 		return self.y
 	else
-		return self.y + self.height()
+		return self.y + self:height()
 	end
 end
 
+function platform_cls:setslope(nm)
+	self.m = nm
+end
 
+function platform_cls:setleft(nl)
+	self.x = nl
+end
 
-function new_platform_left(_x,_y,_m,_l)
-	return {x=x,y=y,m=m,l=l}
+function platform_cls:setright(nr)
+	self.x = nr - self:width()
+end
+
+function platform_cls:setwidth(nw,keep_side)
+	keep_side=keep_side or "left"
+	local o_r = self:right()
+	self.l = nw*self:hyp()
+	if (keep_side == "right") self:setright(o_r)		
+end
+
+function platform_cls:setbottom(nb)
+	if self.m >= 0 then
+		self.y = nb
+	else
+		self.y = nb+self:height()
+	end
+end
+
+function platform_cls:settop(nt)
+	if self.m <= 0 then
+		self.y = nt
+	else
+		self.y = nb-self:height()
+	end
 end
 __gfx__
 0005500000000000000344444303ee30000a000066666666666666666666666676666666ccccccccccccc7777777777777777ccc000000000000001c0000001c
