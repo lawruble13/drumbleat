@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=true
+	debug_info=false
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -629,6 +629,9 @@ function check_platforms()
 			np:setwidth(rx-lx)
 		end
 		hmin = min(10,np:height()-1)
+		if sgn(m) != sgn(highest.m) then
+			hmin = -1
+		end
 		np:setbottom(highest:top()+rnd(10+hmin)-hmin)
 		highest=np
 		add(gw.platforms,np)
