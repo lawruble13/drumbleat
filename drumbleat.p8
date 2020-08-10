@@ -44,6 +44,12 @@ function _update60()
 	end
 	if not fstep or btnp(4) then
 		if gw.mode == "game" then
+			if 0x34 & @0x5f4c > 0 then
+				pl.js=not pl.jh
+				pl.jh=true
+			else
+				pl.jh=false
+			end
 			update_player_speed()
 			move_player()
 			check_platforms()
@@ -87,6 +93,7 @@ function _draw()
  	print(" vx: "..pl.vx)
  	print(" vy: "..pl.vy)
  end
+ print("btn: "..(btn()))
  cursor(1,65)
 -- print("platforms:")
 -- for pt in all(gw.platforms) do
@@ -193,7 +200,10 @@ end
 function set_camera()
 	local h=gw.by-gw.ty
 	if pl.stn and pl.y > 0.4 * h+gw.cy then
-		gw.cy = pl.y-0.4*h
+		gw.cyt = pl.y-0.4*h
+	end
+	if gw.cy < gw.cyt then
+		gw.cy += min(0.2,gw.cyt-gw.cy)
 	end
 	camera(0,-gw.cy)	
 end
@@ -446,7 +456,7 @@ function update_player_speed()
 			pl.vy /= 2*v
 		end
 		
-		if (btn(2)) then
+		if pl.js then
 			pl.stn = false
 			pl.spt = nil
 			pl.vy += 1.5
@@ -540,8 +550,8 @@ function init_gw()
 		rx=61,
 		ty=3,
 		by=61,
-		cx=0,
-		cy=0
+		cy=0,
+		cyt=0
 	}
 	gw.platforms={}
 	gw.platforms[1]=platform_cls:new({l=48})
@@ -593,7 +603,7 @@ end
 function update_buttons()
 	if btnp(0) or btnp(1) then
 		gw.selected = 1-gw.selected
-	elseif btnp(5) and gw.selected == 0 then
+	elseif (btnp(2) or btnp(4) or btnp(5)) and gw.selected == 0 then
 		pl.score = 0
 		gw.mode = "game"
 	end
