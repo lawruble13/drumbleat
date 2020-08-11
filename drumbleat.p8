@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=true
+	debug_info=false
 	record_state=false
 	record_tiles=false
 	general_debug=false
