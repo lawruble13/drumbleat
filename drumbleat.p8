@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=false
+	debug_info=true
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -48,11 +48,13 @@ function _update60()
 				pl.js=not pl.jh
 				pl.jh=true
 			else
+				pl.js=false
 				pl.jh=false
 			end
 			update_player_speed()
 			move_player()
 			check_platforms()
+			check_powerups()
 		elseif gw.mode == "menu" or gw.mode == "over" then
 			update_buttons()
 		end
@@ -65,6 +67,9 @@ function _draw()
 	if gw.mode == "game" then
 	 for pt in all(gw.platforms) do
  		platform(pt)
+	 end
+	 for pu in all(gw.powerups) do
+	 	powerup(pu)
 	 end
 	 player()
 	 --notebar()
@@ -92,14 +97,19 @@ function _draw()
  	print(" y : "..pl.y)
  	print(" vx: "..pl.vx)
  	print(" vy: "..pl.vy)
+	 print("btn: "..(btn()))
+--  cursor(1,65)
+--  print("platforms:")
+--  for pt in all(gw.platforms) do
+--  	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
+--  end
+--  print(" highest: "..gw.platforms[#gw.platforms]:top())
+		cursor(1,65)
+		print("powerups:")
+		for pu in all(gw.powerups) do
+			print(" {x: "..pu.x..",y: "..pu.y..",type: "..pu.type.."}")
+		end
  end
- print("btn: "..(btn()))
- cursor(1,65)
--- print("platforms:")
--- for pt in all(gw.platforms) do
--- 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
--- end
--- print(" highest: "..gw.platforms[#gw.platforms]:top())
 end
 -->8
 --lowrez drawing functions
@@ -114,9 +124,16 @@ end
 
 function player()
 	if pl.pu then
-		pal(3,pu.c,1)
-		palt(3,false)
 		pl.w=16
+		if pl.pu.dur > stat(8) or pl.pu.dur%2 == 1 then
+			pal(3,pl.pu.col)
+			palt(3,false)
+		else
+			pal(3,0)
+			palt(3,true)
+		end
+		pl.pu.dur -= 1			
+		if (pl.pu.dur == 0) pl.pu=nil
 	else
 		pal(3,0)
 		palt(3,true)
@@ -290,6 +307,16 @@ function draw_best_distance()
 	cursor(32-2*#pb_str,42)
 	print(pb_str)
 end
+
+function powerup(pu)
+	pu.timer += 1
+	pu.timer %= 2*pu.period
+	if pu.timer<pu.period then
+		spr(pu.sn1,gw.lx+pu.x,gw.by-pu.y-pu.h1,pu.w1/8,pu.h1/8)
+	else
+		spr(pu.sn2,gw.lx+pu.x,gw.by-pu.y-pu.h2,pu.w2/8,pu.h2/8)
+	end
+end
 -->8
 --lowrez physics functions
 function move_player()
@@ -305,6 +332,19 @@ function move_player()
 				bc=bcp
 				wall=false
 				_pt=pt
+			end
+		end
+		for pu in all(gw.powerups) do
+			local w=pu.w1
+			local h=pu.h1
+			if pu.timer >= pu.period then
+				w=pu.w2
+				h=pu.h2
+			end
+			if pleft() < pu.x+w and pright() >= pu.x
+				and pbottom() < pu.y+h and ptop() >= pu.y then
+				del(gw.powerups, pu)
+				pl.pu=pu
 			end
 		end
 		if bc <= 1/n_steps then
@@ -434,7 +474,13 @@ function update_player_speed()
 		local pt = pl.spt
 		local k=1/len(1,pt.m)
 		local v=len(pl.vx,pl.vy)
-		local dv=-0.09*pt.m
+		local dv = pt.m
+		if pl.pu and pl.pu.type == 2 then
+			dv = 0
+		else
+			dv *= -0.09
+		end
+		pl.doublejump = false
 		
 		if (btn(0)) then
 			dv -= 0.1
@@ -442,8 +488,8 @@ function update_player_speed()
 		elseif (btn(1)) then
 			dv += 0.1
 			pl.fl = false
-		elseif pt.m==0 then
-			dv = -pl.vx
+		elseif pt.m==0 or (pl.pu and pl.pu.type == 2) then
+			dv = -pl.vx/k
 		end
 		
 		dv=mid(-0.1,dv,0.1)
@@ -459,7 +505,11 @@ function update_player_speed()
 		if pl.js then
 			pl.stn = false
 			pl.spt = nil
-			pl.vy += 1.5
+			if pl.pu and pl.pu.type == 1 then
+				pl.vy += 2.5
+			else
+				pl.vy += 1.5
+			end
 			sfx(11)
 		end
 	else
@@ -474,7 +524,14 @@ function update_player_speed()
 		elseif (pl.vx < 0) then
 			pl.vx -= max(-0.025,pl.vx)
 		end
-		if (pl.vy > -2.5) pl.vy -= 0.0625
+		if (pl.pu and pl.pu.type == 0) then
+			if not pl.doublejump and pl.js then
+				pl.vy += 1.5625
+				sfx(11)
+				pl.doublejump = true
+			end
+		end
+		if (pl.vy > -2.5) pl.vy -= 0.0625		
 	end
 end
 -->8
@@ -556,6 +613,9 @@ function init_gw()
 	gw.platforms={}
 	gw.platforms[1]=platform_cls:new({l=48})
 	
+	gw.powerups={}
+	gw.npu = 70
+	
 	gw.mode="anim"
 	gw.selected=0
 end
@@ -572,7 +632,8 @@ function init_pl()
 		vy=0,
 		fl=false,
 		sn=66,
-		score=0
+		score=0,
+		doublejump = false
 	}
 end
 -->8
@@ -647,7 +708,45 @@ function check_platforms()
 		add(gw.platforms,np)
 	end
 end
+
+function check_powerups()
+	for pu in all(gw.powerups) do
+		if pu.y < gw.cy then
+			del(gw.powerups, pu)
+		end
+	end
+	local cty = gw.cy+gw.by-gw.ty+1
+	if gw.npu < cty+10 then
+		local t = flr(rnd(3))
+		local npu = {
+			y=gw.npu,
+			timer=0,
+			period=stat(8)/4,
+			dur=15*stat(8),
+			type=t,
+			sn1=16*t+3,
+			sn2=16*t+4,
+			w1=5,
+			w2=5,
+			h1=6,
+			h2=7,
+			col=10
+		}
 		
+		if t == 1 then
+			npu.col=9
+		elseif t == 2 then
+			npu.w1=5
+			npu.w2=6
+			npu.h1=5
+			npu.h2=6
+			npu.col=137
+		end
+		npu.x=flr(rnd(gw.rx-gw.lx-max(npu.w1,npu.w2)-2)+1)
+		add(gw.powerups,npu)
+		gw.npu += flr(rnd(50))+50
+	end
+end
 -->8
 --lowrez debug functions
 function csv_print_file(file, name, item, header, sep)
