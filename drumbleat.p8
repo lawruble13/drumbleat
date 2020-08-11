@@ -92,14 +92,14 @@ function _draw()
  	print(" y : "..pl.y)
  	print(" vx: "..pl.vx)
  	print(" vy: "..pl.vy)
- end
- print("btn: "..(btn()))
- cursor(1,65)
--- print("platforms:")
--- for pt in all(gw.platforms) do
--- 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
--- end
--- print(" highest: "..gw.platforms[#gw.platforms]:top())
+	 print("btn: "..(btn()))
+--	 cursor(1,65)
+--	 print("platforms:")
+--	 for pt in all(gw.platforms) do
+--	 	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
+--	 end
+--	 print(" highest: "..gw.platforms[#gw.platforms]:top())
+	end
 end
 -->8
 --lowrez drawing functions
