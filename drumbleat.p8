@@ -139,7 +139,7 @@ function player()
 	if pl.y < gw.cy-pl.h then
 		init_gw()
 		gw.mode = "over"
-		min_t = stat(8)*3
+		min_t = stat(8)*1.5
 		local s = pl.score
 		init_pl()
 		pl.score = s
@@ -328,13 +328,22 @@ function move_player()
 		local wall = true
 		local _pt = nil
 		local bc = wall_collide()
+		local active_x = 0
 		for pt in all(gw.platforms) do
 			local coll = false
-			local bcp=pt_collide(pt)
-			if bcp < bc then
-				bc=bcp
-				wall=false
-				_pt=pt
+			for offset in all(pl.offsets) do
+				local os_x = pl.x-pl.w/2
+				if pl.fl then
+					os_x += pl.w-1-offset
+				else
+					os_x += offset
+				end
+				local bcp=pt_collide(pt,os_x)
+				if bcp < bc then
+					bc=bcp
+					wall=false
+					_pt=pt
+				end
 			end
 		end
 		for pu in all(gw.powerups) do
@@ -348,18 +357,6 @@ function move_player()
 				and gw.by-pbottom()+1 < pu.y+h and gw.by-ptop()+1 >= pu.y then
 				del(gw.powerups, pu)
 				pl.pu=pu
-			end
-			if debug_info and i==1 then
-				print_debug("player:")
-				print_debug(" l: "..pleft())
-				print_debug(" r: "..pright())
-				print_debug(" t: "..ptop())
-				print_debug(" b: "..pbottom())
-				print_debug("powerup:")
-				print_debug(" x: "..pu.x)
-				print_debug(" y: "..pu.y)
-				print_debug(" w: "..w)
-				print_debug(" h: "..h)
 			end
 		end
 		if bc <= 1/n_steps then
@@ -385,10 +382,21 @@ function move_player()
 		end
 	end
 	local pt=pl.spt
-	if (pt and on_floor(pt)) then
-		pl.stn=true
-		pl.y=pt.y+pt.m*(pl.x-pt.x)
-	else
+	if pt then
+		for offset in all(pl.offsets) do
+			local os_x = pl.x-pl.w/2
+			if pl.fl then
+				os_x += pl.w-1-offset
+			else
+				os_x += offset
+			end
+			local os_y = pl.y+pt.m*(os_x-pl.x)
+			if on_floor(pt,os_x,os_y) then
+				pl.stn=true
+				pl.y=pt.y+pt.m*(pl.x-pt.x)
+				return
+			end
+		end
 		pl.stn=false
 		pl.spt=nil
 	end
@@ -426,7 +434,9 @@ function len(x,y)
 	return sqrt(x^2+y^2)
 end
 
-function pt_collide(pt, vx, vy)
+function pt_collide(pt, x, y, vx, vy)
+	x=x or pl.x
+	y=y or pl.y
 	vx=vx or pl.vx
 	vy=vy or pl.vy
 	local d = dot(vx,vy,-pt.m,1)
@@ -435,11 +445,9 @@ function pt_collide(pt, vx, vy)
 	if (d > 0) return 1
 	-- speed one of down towards
 	-- pt, along pt, or 0
-	local x=pl.x
-	local y=pl.y
 	if (d == 0) then
 		-- speed either along pt or 0
-		if on_floor(pt) then
+		if on_floor(pt,x,y) then
 			return 1
 			-- means we can move when
 			-- standing on a platform
@@ -485,7 +493,8 @@ function pt_collide(pt, vx, vy)
 end
 
 function update_player_speed()
-	local jh=1.5+((stat(26)+32)%64-32)/64
+	local eob=stat(26)%128
+	local jh=2-min(eob,128-eob)/64
 	print_debug("jump h: "..jh)
 	if (pl.stn) then
 		local pt = pl.spt
@@ -543,7 +552,11 @@ function update_player_speed()
 		end
 		if (pl.pu and pl.pu.type == 0) then
 			if not pl.doublejump and pl.js then
-				pl.vy += jh+0.0625
+				if pl.vy < 0 then
+					pl.vy = jh
+				else
+					pl.vy += jh+0.0625
+				end
 				sfx(11)
 				pl.doublejump = true
 			end
@@ -650,7 +663,8 @@ function init_pl()
 		fl=false,
 		sn=66,
 		score=0,
-		doublejump = false
+		doublejump = false,
+		offsets = {1,10}
 	}
 end
 -->8
@@ -720,7 +734,7 @@ function check_platforms()
 			np:setleft(lx)
 			np:setwidth(rx-lx)
 		end
-		hmin = min(10,np:height()-1)
+		hmin = 0--min(10,np:height()-1)
 		if sgn(m) != sgn(highest.m) then
 			hmin = -1
 		end
@@ -1192,7 +1206,7 @@ __sfx__
 012000001fa201fa201fa201fa201fa201fa201fa201fa201fa201fa201fa201fa201fa201aa231aa231fa201da201da201da201da201da201da201da201da201da201da201da201da201da2018a2318a231da20
 012000001ba301ba301ba301ba301ba301ba301ba301ba301ba301ba301ba301ba301ba3018a3318a331ba3018a3018a3018a3018a3018a3018a3018a3018a301aa301aa301aa301aa301ea301ea301ea301ea30
 000100001465011150101500f150101501215015150191501e15023150281502c1502e1502e150000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000200001925020250282502a250292502725026250242502225021250202501d2501a250172501425012240102400e2400d2300c2300c2300b2300b2200a2200a2100a2100a2100a2100a2100a2000a2000a200
 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
