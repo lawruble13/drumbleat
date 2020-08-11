@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=false
+	debug_info=true
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -65,6 +65,7 @@ function _update60()
 			update_buttons()
 		end
 	end
+	check_music()
 end
 
 function _draw()
@@ -78,7 +79,6 @@ function _draw()
 	 	powerup(pu)
 	 end
 	 player()
-	 --notebar()
 	 camera(0,0)
 	 cursor(gw.lx+1, gw.ty+1)
 	 print(pl.score,5)
@@ -95,7 +95,8 @@ function _draw()
 		draw_buttons()
 	end
 	camera(0,0)
- border()
+ border()	 
+ notebar()
  if debug_info then
 	 show_debug()
  end
@@ -170,8 +171,7 @@ function draw_specs(specs)
 end
 
 do
-	local anim_frame = 0
-	local anim_dur = stat(8)*8.25
+	local cam_pos = -1
 	function background()
 		if gw.mode == "game" then
 			cls(6)
@@ -189,12 +189,13 @@ do
 		elseif gw.mode == "menu" or gw.mode == "over" then
 			cls(10)
 		elseif gw.mode == "anim" then
-			anim_frame += 1
-			if anim_frame > anim_dur then
+			if stat(24) > 0 then
 				gw.mode = "menu"
 			end
 			cls(10)
-			camera(0,64*(anim_frame/anim_dur-1))
+			cam_pos = max(cam_pos,stat(26)/511-1)
+			
+			camera(0,64*cam_pos)
 		end
 		draw_specs(bg.spr[gw.mode])
 	end
@@ -309,6 +310,14 @@ function powerup(pu)
 		spr(pu.sn1,gw.lx+pu.x,gw.by-pu.y-pu.h1,pu.w1/8,pu.h1/8)
 	else
 		spr(pu.sn2,gw.lx+pu.x,gw.by-pu.y-pu.h2,pu.w2/8,pu.h2/8)
+	end
+end
+
+function notebar()
+	if gw.mode == "game" then
+		local eob = stat(26)%128
+		local nby = 11+48*min(eob,128-eob)/64
+		spr(30,1,nby,1.25,3/8)
 	end
 end
 -->8
@@ -476,6 +485,8 @@ function pt_collide(pt, vx, vy)
 end
 
 function update_player_speed()
+	local jh=1.5+((stat(26)+32)%64-32)/64
+	print_debug("jump h: "..jh)
 	if (pl.stn) then
 		local pt = pl.spt
 		local k=1/len(1,pt.m)
@@ -512,9 +523,9 @@ function update_player_speed()
 			pl.stn = false
 			pl.spt = nil
 			if pl.pu and pl.pu.type == 1 then
-				pl.vy += 2.5
+				pl.vy += jh+1
 			else
-				pl.vy += 1.5
+				pl.vy += jh
 			end
 			sfx(11)
 		end
@@ -532,7 +543,7 @@ function update_player_speed()
 		end
 		if (pl.pu and pl.pu.type == 0) then
 			if not pl.doublejump and pl.js then
-				pl.vy += 1.5625
+				pl.vy += jh+0.0625
 				sfx(11)
 				pl.doublejump = true
 			end
@@ -757,6 +768,16 @@ function check_powerups()
 		gw.npu += flr(rnd(128))+128
 	end
 end
+
+do
+	local melody_options={7}
+	function check_music()
+		if stat(24) < 0 then
+			local ind = flr(rnd(#melody_options))+1
+			music(melody_options[ind])
+		end
+	end
+end
 -->8
 --lowrez debug functions
 function csv_print_file(file, name, item, header, sep)
@@ -909,9 +930,9 @@ __gfx__
 00555500344b33334b3030000aaa00000a7a000066666666766666666666776666776666ccccccccccc71000000000000000001c000000000000001c000001cc
 0555555034b3000034b30000000000000aaa000066666666766666666666677667766766ccccccccccc71000000000000000001c111111110000001c11111ccc
 055555500e30000003e00000000000000000000066666666666666766676677777766666cccccccccccc1000000000000000001ccccccccc0000001ccccccccc
-aaaaaaaa000344444303ee30009000000090000066666667666666766666667777766666ccccccccccc710000ffff00000000000000000000000001111111111
-aaaa9aaa03444444444033e0097900000979000066766666666667766666666777666666cccc77777ccc1000ffffff0000000000000000000000001cccccccc1
-aaaaaaaa044444444444ee30097900000979000066766666666667666666666677666666ccc7117777cc1000ffffff0000000000000000000000001111111111
+aaaaaaaa000344444303ee30009000000090000066666667666666766666667777766666ccccccccccc710000ffff00000000000000000001111111111000000
+aaaa9aaa03444444444033e0097900000979000066766666666667766666666777666666cccc77777ccc1000ffffff0000000000000000001cccccccc1000000
+aaaaaaaa044444444444ee30097900000979000066766666666667666666666677666666ccc7117777cc1000ffffff0000000000000000001111111111000000
 aa9aaa9a34444bb444b44300977790009777900066666666666667666766666677666666cc710007177c1000ffffff0000000000000000000000000000000000
 9aaa9aaa4bb4bbbb4b34b300997990009777900066676666666666666766666667766676cc100007017c1000ffffff0000000000000000000000000000000000
 a9a9a9a93344b3334b033000099900009979900066666666666766666666666666776666cc100000017c1000ffffff0000000000000000000000000000000000
