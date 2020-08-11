@@ -9,11 +9,12 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=true
+	debug_info=false
 	record_state=false
 	record_tiles=false
 	general_debug=false
 	reset_high_score=false
+	platform_below=false
 	
 	cartdata("lawruble13_drumbleat_1")
 	if (reset_high_score) dset(0,0)
@@ -22,7 +23,9 @@ function _init()
 	init_br()
 	init_gw()
 	init_pl()
---	test_platforms()
+	if platform_below then
+		add(gw.platforms,platform_cls:new({y=gw.cy-1,l=48}),1)
+	end
 	
 	if not debug_info then
 		-- when debugging, game tl,
@@ -53,6 +56,9 @@ function _update60()
 			end
 			update_player_speed()
 			move_player()
+			if platform_below then
+				gw.platforms[1].y=gw.cy-1
+			end
 			check_platforms()
 			check_powerups()
 		elseif gw.mode == "menu" or gw.mode == "over" then
@@ -91,24 +97,7 @@ function _draw()
 	camera(0,0)
  border()
  if debug_info then
- 	cursor(65, 0)
- 	print("player:")
- 	print(" x : "..pl.x)
- 	print(" y : "..pl.y)
- 	print(" vx: "..pl.vx)
- 	print(" vy: "..pl.vy)
-	 print("btn: "..(btn()))
---  cursor(1,65)
---  print("platforms:")
---  for pt in all(gw.platforms) do
---  	print(" {x:"..pt.x..",y:"..pt.y..",m:"..pt.m..",l:"..pt.l.."}")
---  end
---  print(" highest: "..gw.platforms[#gw.platforms]:top())
-		cursor(1,65)
-		print("powerups:")
-		for pu in all(gw.powerups) do
-			print(" {x: "..pu.x..",y: "..pu.y..",type: "..pu.type.."}")
-		end
+	 show_debug()
  end
 end
 -->8
@@ -149,6 +138,7 @@ function player()
 	if pl.y < gw.cy-pl.h then
 		init_gw()
 		gw.mode = "over"
+		min_t = stat(8)*3
 		local s = pl.score
 		init_pl()
 		pl.score = s
@@ -219,8 +209,10 @@ function set_camera()
 	if pl.stn and pl.y > 0.4 * h+gw.cy then
 		gw.cyt = pl.y-0.4*h
 	end
-	if gw.cy < gw.cyt then
-		gw.cy += min(0.2,gw.cyt-gw.cy)
+	if pl.y > 0.8*h+gw.cy then
+		gw.cy = pl.y-0.8*h
+	elseif gw.cy < gw.cyt then
+		gw.cy += min(0.3,gw.cyt-gw.cy)
 	end
 	camera(0,-gw.cy)	
 end
@@ -235,27 +227,29 @@ do
 	
 	local bpos_count=0
 	function draw_buttons()
-		bpos_count += 1
-		bpos_count %= 2*stat(8)/3
-		local os = bpos_count\(stat(8)/3)
-		if gw.selected == 0 then		
-			pal(3,15)
-			palt(3,false)
-		else
-			pal(3,0)
-			palt(3,true)
+		if not min_t or min_t <= 0 then
+			bpos_count += 1
+			bpos_count %= 2*stat(8)/3
+			local os = bpos_count\(stat(8)/3)
+			if gw.selected == 0 then		
+				pal(3,15)
+				palt(3,false)
+			else
+				pal(3,0)
+				palt(3,true)
+			end
+			spr(33,20+os,49,2,2)
+			spr(52,22+os,51)
+			if gw.selected == 1 then		
+				pal(3,15)
+				palt(3,false)
+			else
+				pal(3,0)
+				palt(3,true)
+			end
+			spr(33,35+os,49,2,2)
+			spr(0,37+os,51)
 		end
-		spr(33,20+os,49,2,2)
-		spr(52,22+os,51)
-		if gw.selected == 1 then		
-			pal(3,15)
-			palt(3,false)
-		else
-			pal(3,0)
-			palt(3,true)
-		end
-		spr(33,35+os,49,2,2)
-		spr(0,37+os,51)
 	end
 end
 
@@ -341,10 +335,22 @@ function move_player()
 				w=pu.w2
 				h=pu.h2
 			end
-			if pleft() < pu.x+w and pright() >= pu.x
-				and pbottom() < pu.y+h and ptop() >= pu.y then
+			if pleft() - gw.lx < pu.x+w and pright() - gw.lx >= pu.x
+				and gw.by-pbottom()+1 < pu.y+h and gw.by-ptop()+1 >= pu.y then
 				del(gw.powerups, pu)
 				pl.pu=pu
+			end
+			if debug_info and i==1 then
+				print_debug("player:")
+				print_debug(" l: "..pleft())
+				print_debug(" r: "..pright())
+				print_debug(" t: "..ptop())
+				print_debug(" b: "..pbottom())
+				print_debug("powerup:")
+				print_debug(" x: "..pu.x)
+				print_debug(" y: "..pu.y)
+				print_debug(" w: "..w)
+				print_debug(" h: "..h)
 			end
 		end
 		if bc <= 1/n_steps then
@@ -662,17 +668,21 @@ function tile_bg(n)
 end
 
 function update_buttons()
+	print_debug("min_t: "..tostr(min_t))
 	if btnp(0) or btnp(1) then
 		gw.selected = 1-gw.selected
 	elseif (btnp(2) or btnp(4) or btnp(5)) and gw.selected == 0 then
-		pl.score = 0
-		gw.mode = "game"
+		if not min_t or min_t <= 0 then
+			pl.score = 0
+			gw.mode = "game"
+		end
 	end
+	if (min_t) min_t -= 1
 end
 
 function check_platforms()
 	for pt in all(gw.platforms) do
-		if pt:top() < gw.cy then
+		if pt:top() < gw.cy-10 then
 			del(gw.platforms, pt)
 		end
 	end
@@ -744,7 +754,7 @@ function check_powerups()
 		end
 		npu.x=flr(rnd(gw.rx-gw.lx-max(npu.w1,npu.w2)-2)+1)
 		add(gw.powerups,npu)
-		gw.npu += flr(rnd(50))+50
+		gw.npu += flr(rnd(128))+128
 	end
 end
 -->8
@@ -775,6 +785,34 @@ function csv_print (name, item, header, sep)
 		end
 	end
 	return str
+end
+
+do
+	local debug_queue = {}
+	function print_debug(s)
+		if (debug_info) add(debug_queue,s)
+	end
+	
+	function show_debug()
+		local ln=0
+		cursor(0,65)
+		while #debug_queue > 0 do
+			local s = debug_queue[1]
+			deli(debug_queue,1)
+			if #s > 16 then
+				add(debug_queue, sub(s,16),1)
+				s=sub(s,1,15).."\\"
+			end
+			color(0)
+			print(s)
+			ln += 1
+			if ln == 9 then
+				cursor(64,1)
+			elseif ln == 28 then
+				debug_queue={}
+			end
+		end
+	end
 end
 -->8
 -- platform class
