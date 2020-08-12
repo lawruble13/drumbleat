@@ -36,7 +36,6 @@ function _init()
 	if (record_state) csv_print_file("state.csv","state",{gw=gw,pl=pl,but=peek(0x5f4c)},true)
 	setpal()
 	music(0)
---	sfx(1,0,8)
 end
 
 function _update60()
@@ -48,7 +47,7 @@ function _update60()
 	if not fstep or btnp(4) then
 		if gw.mode == "game" then
 			if 0x34 & @0x5f4c > 0 then
-				pl.js=not pl.jh
+				pl.js=(not pl.jh) or (fstep and 0x24 & @0x5f4c > 0)
 				pl.jh=true
 			else
 				pl.js=false
@@ -315,7 +314,7 @@ end
 
 function notebar()
 	if gw.mode == "game" then
-		local eob = stat(26)%128
+		local eob = (stat(26)+64)%128
 		local nby = 11+48*min(eob,128-eob)/64
 		spr(30,1,nby,1.25,3/8)
 	end
@@ -363,8 +362,9 @@ function move_player()
 			pl.x += bc*pl.vx
 			pl.y += bc*pl.vy
 			if wall then
-				if pl.standing then
+				if pl.stn then
 					pl.vx = 0
+					pl.vy = 0
 				else
 					pl.vx *= -0.5
 				end
@@ -493,7 +493,7 @@ function pt_collide(pt, x, y, vx, vy)
 end
 
 function update_player_speed()
-	local eob=stat(26)%128
+	local eob=(stat(26)+64)%128
 	local jh=2-min(eob,128-eob)/64
 	print_debug("jump h: "..jh)
 	if (pl.stn) then
@@ -824,6 +824,11 @@ end
 
 do
 	local debug_queue = {}
+	
+	function clear_debug()
+		debug_queue={}
+	end
+	
 	function print_debug(s)
 		if (debug_info) add(debug_queue,s)
 	end
@@ -831,11 +836,16 @@ do
 	function show_debug()
 		local ln=0
 		cursor(0,65)
-		while #debug_queue > 0 do
-			local s = debug_queue[1]
-			deli(debug_queue,1)
+		local i=1
+		while #debug_queue > 0 and i <= #debug_queue do
+			local s = debug_queue[i]
+			if (not fstep) then
+				deli(debug_queue,1)
+			else
+				i += 1
+			end
 			if #s > 16 then
-				add(debug_queue, sub(s,16),1)
+				add(debug_queue, sub(s,16),i)
 				s=sub(s,1,15).."\\"
 			end
 			color(0)
@@ -844,7 +854,11 @@ do
 			if ln == 9 then
 				cursor(64,1)
 			elseif ln == 28 then
-				debug_queue={}
+				if not fstep then
+					debug_queue={}
+				else
+					i=#debug_queue+1
+				end
 			end
 		end
 	end
