@@ -94,7 +94,8 @@ function _draw()
 		draw_buttons()
 	end
 	camera(0,0)
- border()	 
+ border()
+ draw_alert()
  notebar()
  if debug_info then
 	 show_debug()
@@ -306,7 +307,7 @@ function powerup(pu)
 	pu.timer += 1
 	pu.timer %= 2*pu.period
 	pal(3,3)
-	if pu.timer<pu.period then
+	if stat(26)%64<32 then
 		spr(pu.sn1,gw.lx+pu.x,gw.by-pu.y-pu.h1,pu.w1/8,pu.h1/8)
 	else
 		spr(pu.sn2,gw.lx+pu.x,gw.by-pu.y-pu.h2,pu.w2/8,pu.h2/8)
@@ -318,6 +319,29 @@ function notebar()
 		local eob = (stat(26)+128)%256-192
 		local nby = 35+24*max(eob,-128-eob)/64
 		spr(30,1,nby,1.25,3/8)
+	end
+end
+
+do
+	local alert_str = ""
+	local alert_dur = 0
+	function alert(str,dur)
+		alert_str = str or ""
+		alert_dur = dur or stat(8)
+	end
+	
+	function draw_alert()
+		if alert_dur > 0 then
+			local boxspec = {
+				{2,2,1,7/8,70,0,0,0},
+				{10,2,1/4,1,71,22,0,0},
+				{54,2,1,7/8,71,0,0,0}
+			}
+			draw_specs(boxspec)
+			cursor(32-2*#alert_str,3)
+			print(alert_str)
+			alert_dur -= 1
+		end
 	end
 end
 -->8
@@ -357,6 +381,13 @@ function move_player()
 				and gw.by-pbottom()+1 < pu.y+h and gw.by-ptop()+1 >= pu.y then
 				del(gw.powerups, pu)
 				pl.pu=pu
+				if pu.type == 0 then
+					alert("double jump")
+				elseif pu.type == 1 then
+					alert("high jump")
+				elseif pu.type == 2 then
+					alert("sticky")
+				end
 			end
 		end
 		if bc <= 1/n_steps then
