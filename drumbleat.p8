@@ -78,9 +78,7 @@ function _draw()
 	 	powerup(pu)
 	 end
 	 player()
-	 camera(0,0)
-	 cursor(gw.lx+1, gw.ty+1)
-	 print(pl.score,5)
+	 draw_score()
 	elseif gw.mode == "menu" then
 		draw_logo()
 		draw_buttons()
@@ -307,6 +305,7 @@ function powerup(pu)
 	pu.timer += 1
 	pu.timer %= 2*pu.period
 	pal(3,3)
+	palt(3,false)
 	if stat(26)%64<32 then
 		spr(pu.sn1,gw.lx+pu.x,gw.by-pu.y-pu.h1,pu.w1/8,pu.h1/8)
 	else
@@ -343,6 +342,15 @@ do
 			alert_dur -= 1
 		end
 	end
+end
+
+function draw_score()
+	if gw.drawn_score < pl.score then
+		gw.drawn_score = min(pl.score, gw.drawn_score+5)
+	end
+ camera(0,0)
+ cursor(gw.lx+1, gw.ty+1)
+ print(gw.drawn_score,5)
 end
 -->8
 --lowrez physics functions
@@ -670,7 +678,8 @@ function init_gw()
 		ty=3,
 		by=61,
 		cy=0,
-		cyt=0
+		cyt=0,
+		drawn_score=0
 	}
 	gw.platforms={}
 	gw.platforms[1]=platform_cls:new({l=48})
@@ -801,13 +810,13 @@ function check_powerups()
 		}
 		
 		if t == 1 then
-			npu.col=3
+			npu.col=137
 		elseif t == 2 then
 			npu.w1=5
 			npu.w2=6
 			npu.h1=5
 			npu.h2=6
-			npu.col=137
+			npu.col=3
 		end
 		npu.x=flr(rnd(gw.rx-gw.lx-max(npu.w1,npu.w2)-2)+1)
 		add(gw.powerups,npu)
@@ -822,6 +831,166 @@ do
 			local ind = flr(rnd(#melody_options))+1
 			music(melody_options[ind])
 		end
+	end
+end
+
+bignum = {
+	sign=1,
+	thous={0}
+}
+function bignum:new(o)
+	o = o or {}
+	if type(o) == "number" then
+		o={sign=sgn(o),thous={flr(o)}}
+		if o.thous[1]>=1000 then
+			o.thous[2]=o.thous[1]\1000
+			o.thous[1]%=1000
+		end
+	end
+	self.__index = self
+	return setmetatable(o, self)
+end
+
+function bignum.__tostring(o)
+	local str=""
+	for v in all(o.thous) do
+		str = tostr(v)..str
+	end
+	if (o.sign == -1) str="-"..str
+	return str
+end
+
+function bignum.__len(o)
+	local t = (#o.thous-1)*3+1
+	local i = #o.thous
+	if (o.thous[i] >= 10) t += 1
+	if (o.thous[i] >= 100) t += 1
+	return t
+end
+
+function bignum.__eq(o1,o2)
+	if (o1.sign != o2.sign) return false
+	if (#o1.thous != #o2.thous) return false
+	for i=1,#o1.thous do
+		if (o1.thous[i] != o2.thous[i]) return false
+	end
+	return true
+end
+
+function bignum.__lt(v1,v2)
+	if (type(v1) == "number") v1=bignum:new(v1)
+	if (type(v2) == "number") v2=bignum:new(v2)
+	if (v1.sign < v2.sign) return true
+	if v1.sign == -1 then
+		if (#v1.thous < #v2.thous) return false
+		if (#v1.thous > #v2.thous) return true
+		for i=#v1.thous,1,-1 do
+			if (v1.thous[i] < v2.thous[i]) return false
+			if (v1.thous[i] > v2.thous[i]) return true
+		end
+		return false
+	else
+		if (#v1.thous < #v2.thous) return true
+		if (#v1.thous > #v2.thous) return false
+		for i=#v1.thous,1,-1 do
+			if (v1.thous[i] < v2.thous[i]) return true
+			if (v1.thous[i] > v2.thous[i]) return false
+		end
+		return false
+	end
+end
+
+function bignum.__le(v1,v2)
+	if (type(v1) == "number") v1=bignum:new(v1)
+	if (type(v2) == "number") v2=bignum:new(v2)
+	if (v1.sign < v2.sign) return true
+	if v1.sign == -1 then
+		if (#v1.thous < #v2.thous) return false
+		if (#v1.thous > #v2.thous) return true
+		for i=#v1.thous,1,-1 do
+			if (v1.thous[i] < v2.thous[i]) return false
+			if (v1.thous[i] > v2.thous[i]) return true
+		end
+		return true
+	else
+		if (#v1.thous < #v2.thous) return true
+		if (#v1.thous > #v2.thous) return false
+		for i=#v1.thous,1,-1 do
+			if (v1.thous[i] < v2.thous[i]) return true
+			if (v1.thous[i] > v2.thous[i]) return false
+		end
+		return true
+	end
+end
+
+function bignum.__add(v1,v1)
+	if (type(v1) == "number") v1=bignum:new(v1)
+	if (type(v2) == "number") v2=bignum:new(v2)
+	if v1.sign == 1 and v2.sign == 1 then
+		local carry = 0
+		local i = 1
+		local t = 0
+		while i <= #v1.thous or i <= #v2.thous do
+			if v1.thous[i] then
+				t = v1.thous[i]
+				t += carry
+				if (v2.thous[i]) then
+					t += v2.thous[i]
+				end
+			else
+				t = v2.thous[i] + carry
+			end				
+			carry=t\1000
+			v1.thous[i]=t%1000
+			i += 1
+		end
+	elseif v1.sign == 1 and v2.sign == -1 then
+		v2.sign = 1
+		v1=v1-v2
+	elseif v1.sign == -1 and v2.sign == 1 then
+		v1.sign = 1
+		v1=v2-v1
+	else
+		v1.sign = 1
+		v2.sign = 1
+		v1=v1+v2
+		v1.sign = -1
+	end
+	return v1
+end
+
+function bignum.__sub(v1,v2)
+	if (type(v1) == "number") v1=bignum:new(v1)
+	if (type(v2) == "number") v2=bignum:new(v2)
+	if v1.sign == 1 and v2.sign == 1 then
+		if v1<v2 then
+			v1=v2-v1
+			v1.sign=-1
+			return v1
+		elseif v1 == v2 then
+			return bignum:new()
+		else
+			local borrow = 0
+			for i=1,#v1.thous do
+				v1.thous[i] -= borrow
+				borrow = 0
+				if v2.thous[i] then
+					if (v1.thous[i] < v2.thous[i]) then
+						v1.thous[i] += 1000
+						borrow = 1
+					end
+					v1.thous[i] -= v2.thous[i]
+				end
+			end
+			return v1
+		end
+	elseif v1.sign != v2.sign then
+		v2.sign *= -1
+		return v1+v2
+	else
+		v1.sign=1
+		v2.sign=1
+		return v2-v1
 	end
 end
 -->8
@@ -990,20 +1159,20 @@ __gfx__
 00555500344b33334b3030000aaa00000a7a000066666666766666666666776666776666ccccccccccc71000000000000000001c000000000000001c000001cc
 0555555034b3000034b30000000000000aaa000066666666766666666666677667766766ccccccccccc71000000000000000001c111111110000001c11111ccc
 055555500e30000003e00000000000000000000066666666666666766676677777766666cccccccccccc1000000000000000001ccccccccc0000001ccccccccc
-aaaaaaaa000344444303ee30003000000030000066666667666666766666667777766666ccccccccccc71000a0000a0000000000000000001111111111000000
-aaaa9aaa03444444444033e0037300000373000066766666666667766666666777666666cccc77777ccc1000aaaaaa0000000000000000001cccccccc1000000
-aaaaaaaa044444444444ee30037300000373000066766666666667666666666677666666ccc7117777cc1000aaaaaa0000000000000000001111111111000000
-aa9aaa9a34444bb444b44300377730003777300066666666666667666766666677666666cc710007177c1000aaaaaa0000000000000000000000000000000000
-9aaa9aaa4bb4bbbb4b34b300337330003777300066676666666666666766666667766676cc100007017c1000aaaaaa0000000000000000000000000000000000
-a9a9a9a93344b3334b033000033300003373300066666666666766666666666666776666cc100000017c1000aaaaaa0000000000000000000000000000000000
-9a9a9a9a034b300034300000000000000333000066666666666766666666666666677766cc100000017c10009999990000000000000000000000000000000000
+aaaaaaaa000344444303ee3000f0000000f0000066666667666666766666667777766666ccccccccccc71000a0000a0000000000000000001111111111000000
+aaaa9aaa03444444444033e00f7f00000f7f000066766666666667766666666777666666cccc77777ccc1000aaaaaa0000000000000000001cccccccc1000000
+aaaaaaaa044444444444ee300f7f00000f7f000066766666666667666666666677666666ccc7117777cc1000aaaaaa0000000000000000001111111111000000
+aa9aaa9a34444bb444b44300f777f000f777f00066666666666667666766666677666666cc710007177c1000aaaaaa0000000000000000000000000000000000
+9aaa9aaa4bb4bbbb4b34b300ff7ff000f777f00066676666666666666766666667766676cc100007017c1000aaaaaa0000000000000000000000000000000000
+a9a9a9a93344b3334b0330000fff0000ff7ff00066666666666766666666666666776666cc100000017c1000aaaaaa0000000000000000000000000000000000
+9a9a9a9a034b300034300000000000000fff000066666666666766666666666666677766cc100000017c10009999990000000000000000000000000000000000
 a999a99900e300003e000000000000000000000066666666666666666666666666666676cc100000017c10009999990000000000000000000000000000000000
-99a999a900033333300000000fff000000ff000066666666666666666666666666666666cc10000001cc10009999990000000000d0000000000000000000000d
-999999990031111113000000ff7ff0000f77f00066666666666667666766666667666666cc100000017c100099999900000000000000d0000000000d000d0000
-999f9999031cccccc1300000f7f7f000f7ff7f0066667666666666666766666667666666cc10000001cc10009999990000000000d0d000000000000000000d0d
-9999999931cccccccc130000ff7ff000f7ff7f0066667666666666666666666667666666cc10000001cc10009999990000000000dd0000d00d000d000d0000dd
-9f999f9931cccccccc1300000fff00000f77f00066666676666766666666666677666766cc10000001cc1000f9999f0000000000d0d0d000000d000d000d0d0d
-999f999f31cccccccc1300000000000000ff000066666676666666666666667677766766cc10000001cc1000ffffff0000000000dd0d0d0dd0d0d0d0d0d0d0dd
+99a999a90003333330000000033300000033000066666666666666666666666666666666cc10000001cc10009999990000000000d0000000000000000000000d
+999999990031111113000000337330000377300066666666666667666766666667666666cc100000017c100099999900000000000000d0000000000d000d0000
+999f9999031cccccc1300000373730003733730066667666666666666766666667666666cc10000001cc10009999990000000000d0d000000000000000000d0d
+9999999931cccccccc130000337330003733730066667666666666666666666667666666cc10000001cc10009999990000000000dd0000d00d000d000d0000dd
+9f999f9931cccccccc130000033300000377300066666676666766666666666677666766cc10000001cc1000f9999f0000000000d0d0d000000d000d000d0d0d
+999f999f31cccccccc130000000000000033000066666676666666666666667677766766cc10000001cc1000ffffff0000000000dd0d0d0dd0d0d0d0d0d0d0dd
 f9f9f9f931cccccccc130000000000000000000066766666666666666666666677766776cc10000001cc1000ffffff0000000000ddddd0dd0ddd0ddd0ddd0ddd
 9f9f9f9f31cccccccc130000000000000000000066666666666666666666666677766776cc10000001cc1000ffffff00000000000dddddddddddddddddddddd0
 f9fff9ff31cccccccc130000000000000000000066666666666666666666666667766776cc10000001cc1000ffffff0000000000007777777777770000000000
