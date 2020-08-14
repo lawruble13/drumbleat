@@ -830,6 +830,20 @@ function check_powerups()
 	end
 	local cty = gw.cy+gw.by-gw.ty+1
 	if gw.npu < cty+10 then
+		local rvd = 128
+		local cy = bignum:new(gw.offset)+gw.cy
+		while (cy > 0) do
+			cy -= 2000
+			if (rvd*2 < 10000) then
+				rvd *= 2
+			else
+				cy = 0
+			end
+		end
+		if pl.pu then
+			gw.npu += flr(rnd(rvd))+rvd
+			return
+		end
 		local t = flr(rnd(3))
 		local npu = {
 			y=gw.npu,
