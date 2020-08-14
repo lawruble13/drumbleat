@@ -836,24 +836,41 @@ end
 
 bignum = {
 	sign=1,
-	thous={0}
+	huns={0}
 }
 function bignum:new(o)
 	o = o or {}
 	if type(o) == "number" then
-		o={sign=sgn(o),thous={flr(o)}}
-		if o.thous[1]>=1000 then
-			o.thous[2]=o.thous[1]\1000
-			o.thous[1]%=1000
-		end
+		o=flr(o)
+		o={
+			sign=sgn(o),
+			huns={
+				o%100,
+				(o\100)%100,
+				o\10000
+			}
+		}
+		o:clrz()
 	end
 	self.__index = self
 	return setmetatable(o, self)
 end
 
+function bignum:clrz()
+	local i=#self.huns
+	while i > 1 do
+		if self.huns[i] == 0
+			deli(self.huns,i)
+		else
+			break
+		end
+		i -= 1
+	end
+end
+
 function bignum.__tostring(o)
 	local str=""
-	for v in all(o.thous) do
+	for v in all(o.huns) do
 		str = tostr(v)..str
 	end
 	if (o.sign == -1) str="-"..str
@@ -861,87 +878,83 @@ function bignum.__tostring(o)
 end
 
 function bignum.__len(o)
-	local t = (#o.thous-1)*3+1
-	local i = #o.thous
-	if (o.thous[i] >= 10) t += 1
-	if (o.thous[i] >= 100) t += 1
+	local t = (#o.huns-1)*2+1
+	local i = #o.huns
+	if (o.huns[i] >= 10) t += 1
 	return t
 end
 
 function bignum.__eq(o1,o2)
 	if (o1.sign != o2.sign) return false
-	if (#o1.thous != #o2.thous) return false
-	for i=1,#o1.thous do
-		if (o1.thous[i] != o2.thous[i]) return false
+	if (#o1.huns != #o2.huns) return false
+	for i=1,#o1.huns do
+		if (o1.huns[i] != o2.huns[i]) return false
 	end
 	return true
 end
 
 function bignum.__lt(v1,v2)
-	if (type(v1) == "number") v1=bignum:new(v1)
-	if (type(v2) == "number") v2=bignum:new(v2)
+	v1,v2=make_bn_pair(v1,v2)
 	if (v1.sign < v2.sign) return true
 	if v1.sign == -1 then
-		if (#v1.thous < #v2.thous) return false
-		if (#v1.thous > #v2.thous) return true
-		for i=#v1.thous,1,-1 do
-			if (v1.thous[i] < v2.thous[i]) return false
-			if (v1.thous[i] > v2.thous[i]) return true
+		if (#v1.huns < #v2.huns) return false
+		if (#v1.huns > #v2.huns) return true
+		for i=#v1.huns,1,-1 do
+			if (v1.huns[i] < v2.huns[i]) return false
+			if (v1.huns[i] > v2.huns[i]) return true
 		end
 		return false
 	else
-		if (#v1.thous < #v2.thous) return true
-		if (#v1.thous > #v2.thous) return false
-		for i=#v1.thous,1,-1 do
-			if (v1.thous[i] < v2.thous[i]) return true
-			if (v1.thous[i] > v2.thous[i]) return false
+		if (#v1.huns < #v2.huns) return true
+		if (#v1.huns > #v2.huns) return false
+		for i=#v1.huns,1,-1 do
+			if (v1.huns[i] < v2.huns[i]) return true
+			if (v1.huns[i] > v2.huns[i]) return false
 		end
 		return false
 	end
 end
 
 function bignum.__le(v1,v2)
-	if (type(v1) == "number") v1=bignum:new(v1)
-	if (type(v2) == "number") v2=bignum:new(v2)
+	v1,v2=make_bn_pair(v1,v2)
 	if (v1.sign < v2.sign) return true
 	if v1.sign == -1 then
-		if (#v1.thous < #v2.thous) return false
-		if (#v1.thous > #v2.thous) return true
-		for i=#v1.thous,1,-1 do
-			if (v1.thous[i] < v2.thous[i]) return false
-			if (v1.thous[i] > v2.thous[i]) return true
+		if (#v1.huns < #v2.huns) return false
+		if (#v1.huns > #v2.huns) return true
+		for i=#v1.huns,1,-1 do
+			if (v1.huns[i] < v2.huns[i]) return false
+			if (v1.huns[i] > v2.huns[i]) return true
 		end
 		return true
 	else
-		if (#v1.thous < #v2.thous) return true
-		if (#v1.thous > #v2.thous) return false
-		for i=#v1.thous,1,-1 do
-			if (v1.thous[i] < v2.thous[i]) return true
-			if (v1.thous[i] > v2.thous[i]) return false
+		if (#v1.huns < #v2.huns) return true
+		if (#v1.huns > #v2.huns) return false
+		for i=#v1.huns,1,-1 do
+			if (v1.huns[i] < v2.huns[i]) return true
+			if (v1.huns[i] > v2.huns[i]) return false
 		end
 		return true
 	end
 end
 
 function bignum.__add(v1,v1)
-	if (type(v1) == "number") v1=bignum:new(v1)
-	if (type(v2) == "number") v2=bignum:new(v2)
+	v1,v2=make_bn_pair(v1,v2)
 	if v1.sign == 1 and v2.sign == 1 then
 		local carry = 0
 		local i = 1
 		local t = 0
-		while i <= #v1.thous or i <= #v2.thous do
-			if v1.thous[i] then
-				t = v1.thous[i]
+		while i <= #v1.huns or i <= #v2.huns do
+			if v1.huns[i] then
+				t = v1.huns[i]
 				t += carry
-				if (v2.thous[i]) then
-					t += v2.thous[i]
+				if (v2.huns[i]) then
+					t += v2.huns[i]
 				end
 			else
-				t = v2.thous[i] + carry
+				t = v2.huns[i] + carry
 			end				
-			carry=t\1000
-			v1.thous[i]=t%1000
+			carry=t\100
+			v1.huns[i]=t%100
 			i += 1
 		end
 	elseif v1.sign == 1 and v2.sign == -1 then
@@ -960,38 +973,72 @@ function bignum.__add(v1,v1)
 end
 
 function bignum.__sub(v1,v2)
-	if (type(v1) == "number") v1=bignum:new(v1)
-	if (type(v2) == "number") v2=bignum:new(v2)
+	v1,v2=make_bn_pair(v1,v2)
 	if v1.sign == 1 and v2.sign == 1 then
 		if v1<v2 then
 			v1=v2-v1
 			v1.sign=-1
-			return v1
 		elseif v1 == v2 then
-			return bignum:new()
+			v1=bignum:new()
 		else
 			local borrow = 0
-			for i=1,#v1.thous do
-				v1.thous[i] -= borrow
-				borrow = 0
-				if v2.thous[i] then
-					if (v1.thous[i] < v2.thous[i]) then
-						v1.thous[i] += 1000
+			for i=1,#v1.huns do
+				if borrow > 0 then
+					v1.huns[i] -= borrow
+					borrow = 0
+					if v1.huns[i] < 0 then
+						v1.huns[i] += 100
 						borrow = 1
 					end
-					v1.thous[i] -= v2.thous[i]
+				end
+				if v2.huns[i] then
+					if (v1.huns[i] < v2.huns[i]) then
+						v1.huns[i] += 100
+						borrow = 1
+					end
+					v1.huns[i] -= v2.huns[i]
 				end
 			end
-			return v1
 		end
 	elseif v1.sign != v2.sign then
 		v2.sign *= -1
-		return v1+v2
+		v1=v1+v2
 	else
 		v1.sign=1
 		v2.sign=1
-		return v2-v1
+		v1=v2-v1
 	end
+	v1:clrz()
+	return v1
+end
+
+function bignum.__mul(v1,v1)
+	v1,v2=make_bn_pair(v1,v2)
+	if (v1 > v2) return v2*v1
+	local res = bignum:new(v1.sign*v1.huns[1]*v2.sign*v2.huns[1])
+	local i=0
+	local j=1
+	while i < #v1.huns do
+		while j < #v2.huns do
+			local tmp = v1[i+1]*v2[i+1]
+			local ind=1+j+1
+			while tmp > 0 do
+				if (res[ind]) tmp += res[ind]
+				res[ind] = tmp%100
+				tmp \= 100
+				ind += 1
+			end
+			j += 1
+		end
+		i += 1
+	end
+	return res
+end
+
+function make_bn_pair(v1,v2)
+	if (type(v1) == "number") v1=bignum:new(v1)
+	if (type(v2) == "number") v2=bignum:new(v2)
+	return v1,v2
 end
 -->8
 --lowrez debug functions
