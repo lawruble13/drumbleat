@@ -9,15 +9,17 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=false
+	debug_info=true
 	record_state=false
 	record_tiles=false
 	general_debug=false
 	reset_high_score=false
 	platform_below=false
 	
-	cartdata("lawruble13_drumbleat_1")
-	if (reset_high_score) dset(0,0)
+	cartdata("lawruble13_drumbleat_2")
+	if (reset_high_score) then
+		store_score(bignum:new())
+	end
 	
 	init_bg()
 	init_br()
@@ -26,6 +28,7 @@ function _init()
 	if platform_below then
 		add(gw.platforms,platform_cls:new({y=gw.cy-1,l=48}),1)
 	end
+	gw.stored_hs = get_stored_score()
 	
 	if not debug_info then
 		-- when debugging, game tl,
@@ -65,6 +68,12 @@ function _update60()
 		end
 	end
 	check_music()
+	print_debug("pl.score: "..type(pl.score))
+	print_debug(tostr(pl.score))
+	print_debug("gw.stored_hs: "..type(gw.stored_hs))
+	print_debug(tostr(gw.stored_hs))
+	print_debug("gw.drawn_score: "..type(gw.drawn_score))
+	print_debug(tostr(gw.drawn_score))
 end
 
 function _draw()
@@ -84,7 +93,7 @@ function _draw()
 		draw_buttons()
 	elseif gw.mode == "over" then
 		draw_final_dist()
-		if pl.score > dget(0) then
+		if gw.nhs then
 			draw_high_score()
 		else
 			draw_best_distance()
@@ -129,16 +138,24 @@ function player()
 	end
 	if pl.stn then
 		pl.sn=17
-		pl.score = max(pl.score, flr(pl.y*10))
+		if (gw.offset+pl.y)*10 > pl.score then
+			pl.score = (gw.offset+pl.y)*7
+		end
 	else
 		pl.sn=1
 	end
 	spr(pl.sn,pleft(),ptop(),pl.w/8,pl.h/8,pl.fl)
 	if pl.y < gw.cy-pl.h then
-		init_gw()
-		gw.mode = "over"
 		min_t = stat(8)*1.5
 		local s = pl.score
+		init_gw()
+		gw.mode = "over"
+		gw.stored_hs = get_stored_score()
+		if s > gw.stored_hs then
+			store_score(s)
+			gw.nhs = true
+			gw.stored_hs = s
+		end
 		init_pl()
 		pl.score = s
 	end
@@ -213,6 +230,19 @@ function set_camera()
 	elseif gw.cy < gw.cyt then
 		gw.cy += min(0.3,gw.cyt-gw.cy)
 	end
+	if gw.cy > 10000 then
+		gw.cy -= 10000
+		gw.cyt -= 10000
+		pl.y -= 10000
+		for pt in all(gw.platforms) do
+			pt.y -= 10000
+		end
+		for pu in all(gw.powerups) do
+			pu.y -= 10000
+		end
+		gw.npu -= 10000
+		gw.offset += 10000
+	end
 	camera(0,-gw.cy)	
 end
 
@@ -278,7 +308,6 @@ function draw_high_score()
 	draw_specs(boxspec)
 	cursor(10,33)
 	print("high score!")
-	dset(0,pl.score-1)
 end
 
 function draw_best_distance()
@@ -296,7 +325,7 @@ function draw_best_distance()
 		{52,40,1,1,87,0,0,0}
 	}
 	draw_specs(boxspec)
-	local pb_str=tostr(dget(0)+1)
+	local pb_str=tostr(gw.stored_hs)
 	cursor(32-2*#pb_str,42)
 	print(pb_str)
 end
@@ -346,7 +375,11 @@ end
 
 function draw_score()
 	if gw.drawn_score < pl.score then
-		gw.drawn_score = min(pl.score, gw.drawn_score+5)
+		if gw.drawn_score+5 > pl.score then
+			gw.drawn_score=pl.score
+		else
+			gw.drawn_score += 5
+		end
 	end
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
@@ -679,7 +712,8 @@ function init_gw()
 		by=61,
 		cy=0,
 		cyt=0,
-		drawn_score=0
+		drawn_score=bignum:new(),
+		offset=bignum:new()
 	}
 	gw.platforms={}
 	gw.platforms[1]=platform_cls:new({l=48})
@@ -689,12 +723,14 @@ function init_gw()
 	
 	gw.mode="anim"
 	gw.selected=0
+	
+	gw.stored_hs=bignum:new()
 end
 
 function init_pl()
 	pl = {
 		x=31,
-		y=4,
+		y=0.5,
 		w=16,
 		h=8,
 		stn=false,
@@ -703,9 +739,10 @@ function init_pl()
 		vy=0,
 		fl=false,
 		sn=66,
-		score=0,
+		score=bignum:new(30000)*2,
 		doublejump = false,
-		offsets = {1,10}
+		offsets = {1,10},
+		nhs = false
 	}
 end
 -->8
@@ -735,15 +772,15 @@ end
 
 function update_buttons()
 	print_debug("min_t: "..tostr(min_t))
-	if btnp(0) or btnp(1) then
-		gw.selected = 1-gw.selected
-	elseif (btnp(2) or btnp(4) or btnp(5)) and gw.selected == 0 then
-		if not min_t or min_t <= 0 then
+	if not min_t or min_t <= 0 then
+		if btnp(0) or btnp(1) then
+			gw.selected = 1-gw.selected
+		elseif (btnp(2) or btnp(4) or btnp(5)) and gw.selected == 0 then	
 			pl.score = 0
 			gw.mode = "game"
 		end
 	end
-	if (min_t) min_t -= 1
+	if (min_t and min_t > 0) min_t -= 1
 end
 
 function check_platforms()
@@ -834,23 +871,33 @@ do
 	end
 end
 
-bignum = {
-	sign=1,
-	huns={0}
-}
+bignum = {}
 function bignum:new(o)
-	o = o or {}
 	if type(o) == "number" then
 		o=flr(o)
-		o={
-			sign=sgn(o),
-			huns={
-				o%100,
-				(o\100)%100,
-				o\10000
-			}
+		local tmp={}
+		tmp.sign=sgn(o)
+		o=abs(o)
+		tmp.huns={
+			o%100,
+			(o\100)%100,
+			o\10000
 		}
-		o:clrz()
+		o=tmp
+		if o.huns[3] == 0 then
+			deli(o.huns,3)
+			if (o.huns[2] == 0) deli(o.huns,2)
+		end
+	elseif type(o) == "table" then
+		local tmp = {}
+		tmp.sign=o.sign or 1
+		tmp.huns={}
+		for v in all(o.huns) do
+			add(tmp.huns,v)
+		end
+		o=tmp
+	elseif type(o) == "nil" then
+		o={sign=1,huns={0}}
 	end
 	self.__index = self
 	return setmetatable(o, self)
@@ -859,7 +906,7 @@ end
 function bignum:clrz()
 	local i=#self.huns
 	while i > 1 do
-		if self.huns[i] == 0
+		if self.huns[i] == 0 then
 			deli(self.huns,i)
 		else
 			break
@@ -870,8 +917,10 @@ end
 
 function bignum.__tostring(o)
 	local str=""
-	for v in all(o.huns) do
-		str = tostr(v)..str
+	for i,v in ipairs(o.huns) do
+		local toadd=tostr(v)
+		if (i != #o.huns and #toadd == 1) toadd="0"..toadd
+		str = toadd..str
 	end
 	if (o.sign == -1) str="-"..str
 	return str
@@ -884,161 +933,184 @@ function bignum.__len(o)
 	return t
 end
 
-function bignum.__eq(o1,o2)
-	if (o1.sign != o2.sign) return false
-	if (#o1.huns != #o2.huns) return false
-	for i=1,#o1.huns do
-		if (o1.huns[i] != o2.huns[i]) return false
+function bignum:rel_ind(other)
+	if (type(other) == "number") other=bignum:new(other)
+	assert(other.sign)
+	assert(other.huns)
+	if (#self.huns == 1 and self.huns[1] == 0 and #other.huns == 1 and other.huns[1] == 0) return 0
+	if (self.sign < other.sign) return -1
+	if (self.sign > other.sign) return 1
+	if (#self.huns < #other.huns) return -self.sign
+	if (#self.huns > #other.huns) return self.sign
+	for i=#self.huns,1,-1 do
+		if (self.huns[i] < other.huns[i]) return -self.sign
+		if (self.huns[i] > other.huns[i]) return self.sign
 	end
-	return true
+	return 0
+end
+
+function bignum.__eq(v1,v2)
+	return v1:rel_ind(v2) == 0
 end
 
 function bignum.__lt(v1,v2)
 	v1,v2=make_bn_pair(v1,v2)
-	if (v1.sign < v2.sign) return true
-	if v1.sign == -1 then
-		if (#v1.huns < #v2.huns) return false
-		if (#v1.huns > #v2.huns) return true
-		for i=#v1.huns,1,-1 do
-			if (v1.huns[i] < v2.huns[i]) return false
-			if (v1.huns[i] > v2.huns[i]) return true
-		end
-		return false
-	else
-		if (#v1.huns < #v2.huns) return true
-		if (#v1.huns > #v2.huns) return false
-		for i=#v1.huns,1,-1 do
-			if (v1.huns[i] < v2.huns[i]) return true
-			if (v1.huns[i] > v2.huns[i]) return false
-		end
-		return false
-	end
+	return v1:rel_ind(v2) < 0
 end
 
 function bignum.__le(v1,v2)
 	v1,v2=make_bn_pair(v1,v2)
-	if (v1.sign < v2.sign) return true
-	if v1.sign == -1 then
-		if (#v1.huns < #v2.huns) return false
-		if (#v1.huns > #v2.huns) return true
-		for i=#v1.huns,1,-1 do
-			if (v1.huns[i] < v2.huns[i]) return false
-			if (v1.huns[i] > v2.huns[i]) return true
-		end
-		return true
-	else
-		if (#v1.huns < #v2.huns) return true
-		if (#v1.huns > #v2.huns) return false
-		for i=#v1.huns,1,-1 do
-			if (v1.huns[i] < v2.huns[i]) return true
-			if (v1.huns[i] > v2.huns[i]) return false
-		end
-		return true
-	end
+	return v1:rel_ind(v2) <= 0
 end
 
-function bignum.__add(v1,v1)
+function bignum.__unm(v)
+	local o = bignum:new(v)
+	o.sign *= -1
+	return o
+end
+
+function bignum.__add(v1,v2)
 	v1,v2=make_bn_pair(v1,v2)
+	local res = bignum:new(v1)
 	if v1.sign == 1 and v2.sign == 1 then
 		local carry = 0
 		local i = 1
 		local t = 0
-		while i <= #v1.huns or i <= #v2.huns do
+		while i <= #v1.huns or i <= #v2.huns or carry > 0 do
+			t=0
 			if v1.huns[i] then
-				t = v1.huns[i]
-				t += carry
-				if (v2.huns[i]) then
-					t += v2.huns[i]
-				end
-			else
-				t = v2.huns[i] + carry
+				t += v1.huns[i]
+			end
+			if v2.huns[i] then
+				t += v2.huns[i]
 			end				
+			t += carry
 			carry=t\100
-			v1.huns[i]=t%100
+			res.huns[i]=t%100
 			i += 1
 		end
 	elseif v1.sign == 1 and v2.sign == -1 then
-		v2.sign = 1
-		v1=v1-v2
+		res=v1-(-v2)
 	elseif v1.sign == -1 and v2.sign == 1 then
-		v1.sign = 1
-		v1=v2-v1
+		res=v2-(-v1)
 	else
-		v1.sign = 1
-		v2.sign = 1
-		v1=v1+v2
-		v1.sign = -1
+		res=-((-v1)+(-v2))
 	end
-	return v1
+	return res
 end
 
 function bignum.__sub(v1,v2)
 	v1,v2=make_bn_pair(v1,v2)
+	local res=bignum:new()
 	if v1.sign == 1 and v2.sign == 1 then
 		if v1<v2 then
-			v1=v2-v1
-			v1.sign=-1
+			return -(v2-v1)
 		elseif v1 == v2 then
-			v1=bignum:new()
+			return bignum:new()
 		else
+			local res = bignum:new(v1)
 			local borrow = 0
-			for i=1,#v1.huns do
+			for i=1,#res.huns do
 				if borrow > 0 then
-					v1.huns[i] -= borrow
+					res.huns[i] -= borrow
 					borrow = 0
-					if v1.huns[i] < 0 then
-						v1.huns[i] += 100
+					if res.huns[i] < 0 then
+						res.huns[i] += 100
 						borrow = 1
 					end
 				end
 				if v2.huns[i] then
-					if (v1.huns[i] < v2.huns[i]) then
-						v1.huns[i] += 100
+					if (res.huns[i] < v2.huns[i]) then
+						res.huns[i] += 100
 						borrow = 1
 					end
-					v1.huns[i] -= v2.huns[i]
+					res.huns[i] -= v2.huns[i]
 				end
 			end
+			res:clrz()
+			return res
 		end
 	elseif v1.sign != v2.sign then
-		v2.sign *= -1
-		v1=v1+v2
+		return v1+(-v2)
 	else
-		v1.sign=1
-		v2.sign=1
-		v1=v2-v1
+		return (-v2)-(-v1)
 	end
-	v1:clrz()
-	return v1
 end
 
-function bignum.__mul(v1,v1)
+function bignum.__mul(v1,v2)
 	v1,v2=make_bn_pair(v1,v2)
-	if (v1 > v2) return v2*v1
-	local res = bignum:new(v1.sign*v1.huns[1]*v2.sign*v2.huns[1])
+	if (v1 > v2) then
+		return v2*v1
+	end
+	local res = bignum:new()
 	local i=0
-	local j=1
+	local j=0
 	while i < #v1.huns do
 		while j < #v2.huns do
-			local tmp = v1[i+1]*v2[i+1]
-			local ind=1+j+1
+			local tmp = v1.huns[i+1]*v2.huns[j+1]			
+			local ind=i+j+1
+			if (not res.huns[ind]) res.huns[ind] = 0			
 			while tmp > 0 do
-				if (res[ind]) tmp += res[ind]
-				res[ind] = tmp%100
+				if (res.huns[ind]) tmp += res.huns[ind]
+				res.huns[ind] = tmp%100
 				tmp \= 100
 				ind += 1
 			end
 			j += 1
 		end
 		i += 1
+		j=0
+	end
+	res.sign=v1.sign*v2.sign
+	res:clrz()
+	return res
+end
+
+function bignum:tonum()
+	local rmax = bignum:new(16384)*bignum:new(2)-1
+	local rmin = bignum:new(-16384)*bignum:new(2)
+	if (self > rmax) return rmax
+	if (self < rmin) return rmxn
+	local tmp = 0
+	for i in 1,#self.huns do
+		tmp += self.sign*self.huns[i]*(100^(i-1))
+	end
+end
+
+function make_bn_pair(v1,v2)
+	if (type(v1) != "table") v1=bignum:new(v1)
+	if (type(v2) != "table") v2=bignum:new(v2)
+	return v1,v2
+end
+
+function get_stored_score()
+	local res = bignum:new()
+	if dget(0) > 100 then
+		res.sign = -1
+		res.huns[1] = 200-dget(0)
+	else
+		res.huns[1] = 100-dget(0)
+	end
+	for i=1,63 do
+		if (dget(i) == 0) break
+		res.huns[i+1] = 100-dget(i)
 	end
 	return res
 end
 
-function make_bn_pair(v1,v2)
-	if (type(v1) == "number") v1=bignum:new(v1)
-	if (type(v2) == "number") v2=bignum:new(v2)
-	return v1,v2
+function store_score(s)
+	if s.sign < 0 then
+		dset(0,200-s.huns[1])
+	else
+		dset(0,100-s.huns[1])
+	end
+	for i=1,63 do
+		if s.huns[i+1] then
+			dset(i,100-s.huns[i+1])
+		else
+			dset(i,0)
+		end
+	end
 end
 -->8
 --lowrez debug functions

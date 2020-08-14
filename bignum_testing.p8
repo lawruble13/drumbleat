@@ -68,6 +68,7 @@ function bignum:rel_ind(other)
 	if (type(other) == "number") other=bignum:new(other)
 	assert(other.sign)
 	assert(other.huns)
+	if (#self.huns == 1 and self.huns[1] == 0 and #other.huns == 1 and other.huns[1] == 0) return 0
 	if (self.sign < other.sign) return -1
 	if (self.sign > other.sign) return 1
 	if (#self.huns < #other.huns) return -self.sign
@@ -172,9 +173,7 @@ function bignum.__mul(v1,v2)
 	if (v1 > v2) then
 		return v2*v1
 	end
-	local res = bignum:new()--v1.sign*v1.huns[1]*v2.sign*v2.huns[1])
-	-- this gets the sign, and
-	-- accounts for i==j==0 below
+	local res = bignum:new()
 	local i=0
 	local j=0
 	while i < #v1.huns do
@@ -193,6 +192,7 @@ function bignum.__mul(v1,v2)
 		i += 1
 		j=0
 	end
+	res.sign=v1.sign*v2.sign
 	res:clrz()
 	return res
 end
@@ -213,8 +213,8 @@ end
 
 function _update()
 	if not failed_test then
-		for i=0,100 do
-			for j = 0, 5 do
+		for i=-128,128 do
+			for j = -128, 128 do
 				local a=bignum:new(i)
 				local b=bignum:new(j)
  			if (i < j and not (a < b) and not failed_test) failed_test="lt "..i..","..j
