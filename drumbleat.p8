@@ -15,6 +15,7 @@ function _init()
 	general_debug=false
 	reset_high_score=false
 	platform_below=false
+	queue_stop=false
 	
 	cartdata("lawruble13_drumbleat_2")
 	if (reset_high_score) then
@@ -29,6 +30,7 @@ function _init()
 		add(gw.platforms,platform_cls:new({y=gw.cy-1,l=48}),1)
 	end
 	gw.stored_hs = get_stored_score()
+	gw.shown_instructions = false
 	
 	if not debug_info then
 		-- when debugging, game tl,
@@ -42,6 +44,8 @@ function _init()
 end
 
 function _update60()
+	if (queue_stop) stop()
+	local dy = pl.y
 	if record_state then
 		csv_print_file("state.csv","state",{gw=gw,pl=pl,but=peek(0x5f4c)})
 		-- btn(4) is 'z' by default
@@ -63,11 +67,15 @@ function _update60()
 			end
 			check_platforms()
 			check_powerups()
-		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" then
+		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" or gw.mode == "inst1" or gw.mode == "inst2" then
 			update_buttons()
 		end
 	end
 	check_music()
+	dy = pl.y-dy
+	if abs(dy) > 10 then
+		printh(dump_str({pl,gw}))
+	end
 end
 
 function _draw()
@@ -101,6 +109,7 @@ function _draw()
  border()
  draw_alert()
  notebar()
+ draw_instructions()
  if debug_info then
 	 show_debug()
  end
@@ -144,17 +153,17 @@ function player()
 	spr(pl.sn,pleft(),ptop(),pl.w/8,pl.h/8,pl.fl)
 	if pl.y < gw.cy-pl.h then
 		min_t = stat(8)*1.5
-		local s = pl.score
+		local nhs = gw.nhs
+		if nhs then
+			store_score(pl.score)
+		end
 		init_gw()
 		gw.mode = "over"
 		gw.stored_hs = get_stored_score()
-		if s > gw.stored_hs then
-			store_score(s)
-			gw.nhs = true
-			gw.stored_hs = s
-		end
+		gw.nhs=nhs
+		gw.last_score = pl.score
 		init_pl()
-		pl.score = s
+		reset_tiles()
 	end
 end
 
@@ -167,11 +176,11 @@ function platform(pt)
 		if pt.h_dark[dx+1] then
 			local i=1
 			while i <= pt.h_dark[dx+1] do
-				pset(ax,gw.by-y+i,5)
+				pset(ax,gw.by-y+i,1)
 				i += 1
 			end
 			i=1
-			while i <= pt.h_light[dx+1]+1 do
+			while i <= pt.h_light[dx+1] do
 				pset(ax,gw.by-y+i,12)
 				i += 1
 			end
@@ -199,39 +208,54 @@ do
 	local snowflakes = {}
 	local d_sf_count = 0
 	function draw_snowfall()
-		if rnd(50) < 1 then
-			add(snowflakes, {x=flr(rnd(64)),y=0})
+		if rnd(30) < 1 then
+			if gw.mode == "game" then
+				add(snowflakes, {x=gw.lx+flr(rnd(gw:w())),y=0})
+			else
+				add(snowflakes, {x=flr(rnd(64)),y=0})
+			end
 		end
 		d_sf_count += 1
-		d_sf_count %= 10
+		d_sf_count %= 8
 		for sf in all(snowflakes) do
 			if d_sf_count == 0 then
 				sf.y += 1
 			end
-			pset(sf.x,sf.y,7)
+			if (gw.mode != "game") or sf.x >= gw.lx then
+				pset(sf.x,sf.y,7)
+			end
+			if sf.y > 64 then
+				del(snowflakes,sf)
+			end
 		end
 	end
 end
 
 do
 	local cam_pos = -1
+	local last_mul = 0
 	function background()
-		if gw.mode == "game" then
+		if gw.mode == "game" or gw.mode == "inst2" then
 			cls(6)
 			clip(gw.lx,gw.ty,gw.rx-gw.lx,gw.by-gw.ty)
 			if bg.tiles then
+				if last_mul < gw.cy\16 then
+					tile_bg(4)
+					last_mul = gw.cy\16
+				end
+				local y_off = flr(gw.cy)%16
 				for i, c in ipairs(bg.tiles) do
 					if c>0 then
 						local n=5+2*(c%2)+32*(c\2)
 						local t=i-1
-						spr(n,8*(t%8),64-8*(t\8+1),2,2)
+						spr(n,16*(t%4),16*(t\4)-16+y_off,2,2)
 					end
 				end
 			end
 			clip()
-		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" then
+		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" or gw.mode == "inst1" then
 			cls(10)
-		elseif gw.mode == "anim" then
+		elseif gw.mode == "intro" then
 			if stat(24) > 0 then
 				gw.mode = "menu"
 			end
@@ -242,6 +266,10 @@ do
 		end
 		draw_specs(bg.spr[gw.mode])
 		draw_snowfall()
+	end
+	
+	function reset_tiles()
+		last_mul = 0
 	end
 end
 
@@ -271,6 +299,7 @@ function set_camera()
 		end
 		gw.npu -= 10000
 		gw.offset += 10000
+		reset_tiles()
 	end
 	camera(0,-gw.cy)	
 end
@@ -306,55 +335,55 @@ do
 	end
 end
 
-function draw_final_dist()
+function text_box(str,y,snowy)
 	local boxspec = {
-		{4,14,1,1,61,0,0,0},
-		{12,14,1/4,1,62,19,0,0},
-		{52,14,1,1,62,0,0,0},
-		{4,22,1,1,77,0,0,0},
-		{12,22,1/4,1,78,19,0,0},
-		{52,22,1,1,78,0,0,0}
+		{4 ,y,1  ,1,86,0 ,0,0},
+		{12,y,1/4,1,87,19,0,0},
+		{52,y,1  ,1,87,0 ,0,0}
+	}
+	local x=32-str_disp_width(str)/2
+	if not snowy then
+		for item in all(boxspec) do
+			item[5] -= 16
+			item[4] = 7/8
+		end
+		cursor(x,y+1)
+	else
+		cursor(x,y+2)
+	end
+	draw_specs(boxspec)
+	color(5)
+	print(str)
+end
+
+function tall_text_box(str1,str2,y)
+	local boxspec = {
+		{4,y,1,1,61,0,0,0},
+		{12,y,1/4,1,62,19,0,0},
+		{52,y,1,1,62,0,0,0},
+		{4,y+7,1,1,77,0,0,0},
+		{12,y+7,1/4,1,78,19,0,0},
+		{52,y+7,1,1,78,0,0,0}
 	}
 	draw_specs(boxspec)
-	cursor(16,16)
+	cursor(32-str_disp_width(str1)/2,y+2)
 	color(5)
-	print("distance")
-	local score_str=tostr(pl.score)
-	cursor(32-#score_str*2,23)
-	print(score_str)
+	print(str1)
+	cursor(32-str_disp_width(str2)/2,y+8)
+	print(str2)
+end
+
+function draw_final_dist()
+	tall_text_box("distance",tostr(gw.last_score),14)
 end
 
 function draw_high_score()
-	local boxspec = {
-		{4,31,1,1,86,0,0,0},
-		{12,31,1/4,1,87,19,0,0},
-		{52,31,1,1,87,0,0,0}
-	}
-	draw_specs(boxspec)
-	color(5)
-	cursor(10,33)
-	print("high score!")
+	text_box("high store!",31,true)
 end
 
 function draw_best_distance()
-	local boxspec = {
-		{4,31,1,1,86,0,0,0},
-		{12,31,1/4,1,87,19,0,0},
-		{52,31,1,1,87,0,0,0}
-	}
-	draw_specs(boxspec)
-	color(5)
-	cursor(12,33)
-	print("prev best:")
-	boxspec = {
-		{4,40,1,1,86,0,0,0},
-		{12,40,1/4,1,87,19,0,0},
-		{52,40,1,1,87,0,0,0}
-	}
-	draw_specs(boxspec)
-	local pb_str=tostr(gw.stored_hs)
-	cursor(32-2*#pb_str,42)
-	print(pb_str)
+	text_box("prev best:",31,true)
+	text_box(tostr(gw.stored_hs),40,false)
 end
 
 function powerup(pu)
@@ -370,7 +399,7 @@ function powerup(pu)
 end
 
 function notebar()
-	if gw.mode == "game" then
+	if gw.mode == "game" or gw.mode == "inst2" then
 		local eob = (stat(26)+128)%256-192
 		local nby = 35+24*max(eob,-128-eob)/64
 		spr(30,1,nby,1.25,3/8)
@@ -387,15 +416,7 @@ do
 	
 	function draw_alert()
 		if alert_dur > 0 then
-			local boxspec = {
-				{2,2,1,7/8,70,0,0,0},
-				{10,2,1/4,1,71,22,0,0},
-				{54,2,1,7/8,71,0,0,0}
-			}
-			draw_specs(boxspec)
-			color(5)
-			cursor(32-2*#alert_str,3)
-			print(alert_str)
+			text_box(alert_str,2,false)
 			alert_dur -= 1
 		end
 	end
@@ -409,6 +430,10 @@ function draw_score()
 			gw.drawn_score += 5
 		end
 	end
+	if pl.score > gw.stored_hs and gw.mode == "game" and not gw.nhs then
+		alert("high score!")
+		gw.nhs=true
+	end
 	color(5)
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
@@ -416,42 +441,22 @@ function draw_score()
 end
 
 function draw_credits()
-	local boxspec = {
-		{4,4,1,1,61,0,0,0},
-		{12,4,1/4,1,62,19,0,0},
-		{52,4,1,1,62,0,0,0},
-		{4,11,1,1,77,0,0,0},
-		{12,11,1/4,1,78,19,0,0},
-		{52,11,1,1,78,0,0,0}
-	}
-	draw_specs(boxspec)
-	local str="art: hannah"
-	cursor(32-#str*2,6)
-	color(5)
-	print(str)
-	str="zaitlin"
-	cursor(32-#str*2,12)
-	print(str)
-	for item in all(boxspec) do
-		item[2] += 15
+	tall_text_box("art: hannah","zaitlin",4)
+	tall_text_box("music: jon","malley",19)
+	tall_text_box("code: liam","wrubleski",34)
+end
+
+function draw_instructions()
+	if gw.mode == "inst1" then
+		text_box("left: ⬅️",4,true)
+		text_box("right: ➡️",14,true)
+		text_box("jump/select",24,true)
+		tall_text_box("⬆️/⬇️/🅾️/❎","(⬆️/⬇️/z/x)",34)
+		text_box("continue >",50)
+	elseif gw.mode == "inst2" then
+		tall_text_box("jumps on beat","go higher",4)
+		tall_text_box("the bar shows","the beat",40)
 	end
-	draw_specs(boxspec)
-	local str="music: jon"
-	cursor(32-#str*2,21)
-	print(str)
-	str="malley"
-	cursor(32-#str*2,27)
-	print(str)
-	for item in all(boxspec) do
-		item[2] += 15
-	end
-	draw_specs(boxspec)
-	local str="code: liam"
-	cursor(32-#str*2,36)
-	print(str)
-	str="wrubleski"
-	cursor(32-#str*2,42)
-	print(str)
 end
 -->8
 --lowrez physics functions
@@ -738,11 +743,13 @@ function init_bg()
 		{0,5,1,3,16,7,0,0},
 		{0,0,8,8,136,0,0,0}
 	}
-	bg.spr.anim=bg.spr.menu
+	bg.spr.intro=bg.spr.menu
 	bg.spr.over=bg.spr.menu
 	bg.spr.credits=bg.spr.menu
+	bg.spr.inst1=bg.spr.credits
+	bg.spr.inst2=bg.spr.game
 	bg.tiles={}
-	tile_bg(72)
+	tile_bg(20,20)
 	bg.offset=0
 end
 
@@ -769,9 +776,11 @@ function init_br()
  	{8, 56,1,1,13,5,0,0},
  	{56,56,1,1,15,0,0,0}
  }	
- br.spr.anim=br.spr.menu
+ br.spr.intro=br.spr.menu
  br.spr.over=br.spr.menu
  br.spr.credits=br.spr.menu
+ br.spr.inst1=br.spr.menu
+ br.spr.inst2=br.spr.game
 end
 
 function init_gw()
@@ -783,7 +792,11 @@ function init_gw()
 		cy=0,
 		cyt=0,
 		drawn_score=bignum:new(),
-		offset=bignum:new()
+		offset=bignum:new(),
+		w=function(self)
+			return self.rx-self.lx+1
+		end,
+		shown_instructions=true
 	}
 	gw.platforms={}
 	gw.platforms[1]=platform_cls:new({l=48})
@@ -791,7 +804,7 @@ function init_gw()
 	gw.powerups={}
 	gw.npu = 70
 	
-	gw.mode="anim"
+	gw.mode="intro"
 	gw.selected=0
 	
 	gw.stored_hs=bignum:new()
@@ -817,21 +830,21 @@ function init_pl()
 end
 -->8
 -- lowrez misc functions
-function tile_bg(n)
+function tile_bg(n,ml)
+	if (not bg) init_bg()
+	if (not bg.tiles) bg.tiles={}
 	n = n or 8
-	for i, v in ipairs(bg.tiles) do
-		if i > n then
-			bg.tiles[i] = bg.tiles[i-n]
-		end
-	end
+	ml = ml or #bg.tiles 
 	for i=1,n do
-		local r = flr(rnd(10))
-		if r<4 then
-			bg.tiles[i] = r
-		else
-			bg.tiles[i] = -1
-		end
+		local r = flr(rnd(8))
+		if (r >= 4) r=-1
+		add(bg.tiles,r,1)
 	end
+	
+	while #bg.tiles < ml do
+		deli(bg.tiles,#bg.tiles)
+	end
+	
 	if record_tiles then
 		local l = #(bg.tiles)
 		for i = 1,l/8 do
@@ -846,9 +859,20 @@ function update_buttons()
 		if btnp(0) or btnp(1) then
 			gw.selected = 1-gw.selected
 		elseif (btnp(2) or btnp(4) or btnp(5)) then	
-			if gw.selected == 0 then
-				pl.score = 0
+			if gw.mode == "inst1" then
+				gw.mode = "inst2"
+				min_t = stat(8)
+			elseif gw.mode == "inst2" then
 				gw.mode = "game"
+			elseif gw.selected == 0 then
+				pl.score = 0
+				gw.nhs = false
+				if gw.shown_instructions then
+					gw.mode = "game"
+				else
+					gw.mode = "inst1"
+					min_t = stat(8)
+				end
 			else
 				if gw.mode == "credits" then
 					gw.mode = "menu"
@@ -863,14 +887,17 @@ end
 
 function check_platforms()
 	for pt in all(gw.platforms) do
-		if pt:top() < gw.cy-10 then
+		if pt:top() < gw.cy-5 then
 			del(gw.platforms, pt)
 		end
 	end
 	local num_pt = #gw.platforms
 	local highest = gw.platforms[num_pt]
 	local gww=gw.rx-gw.lx+1
-	while highest:top() < gw.cy + gw.by - gw.ty do
+	if not highest then
+		highest = platform_cls:new()
+	end
+	while highest:top() < gw.cy + gw.by - gw.ty+5 do
 		local np = platform_cls:new()
 		local m = rnd(1.8)-0.9
 		if m >= 0 then
@@ -914,7 +941,7 @@ function check_powerups()
 		while (cy > 0) do
 			cy -= 2000
 			if (rvd*2 < 10000) then
-				rvd *= 2
+				rvd *= 1.1
 			else
 				cy = 0
 			end
@@ -999,6 +1026,284 @@ do
 	end
 end
 
+function get_stored_score()
+	local res = bignum:new()
+	if dget(0) > 100 then
+		res.sign = -1
+		res.huns[1] = 200-dget(0)
+	else
+		res.huns[1] = 100-dget(0)
+	end
+	for i=1,63 do
+		if (dget(i) == 0) break
+		res.huns[i+1] = 100-dget(i)
+	end
+	return res
+end
+
+function store_score(s)
+	if s.sign < 0 then
+		dset(0,200-s.huns[1])
+	else
+		dset(0,100-s.huns[1])
+	end
+	for i=1,63 do
+		if s.huns[i+1] then
+			dset(i,100-s.huns[i+1])
+		else
+			dset(i,0)
+		end
+	end
+end
+
+function str_disp_width(s)
+	local r=0
+	for i=1,#s do
+		if ord(s,i) < 32 or ord(s,i) == 127 then
+			r += 0
+		elseif ord(s,i) < 65 then
+			r += 4
+		elseif ord(s,i) < 91 then
+			r += 8
+		elseif ord(s,i) < 128 then
+			r += 4
+		else
+			r += 8
+		end
+	end
+	return r
+end
+-->8
+--lowrez debug functions
+function csv_print_file(file, name, item, header, sep)
+ printh(csv_print(name, item, header, sep), file, header)
+end
+
+function csv_print (name, item, header, sep)
+	sep = sep or ","
+	str = ""
+	header = header and name != ""
+	if header then
+		if type(item) == "table" then
+			for k, v in pairs(item) do
+				str ..= csv_print(name.."."..k, v, header, sep)
+			end
+		else
+			str = name..sep
+		end
+	else
+		if type(item) == "table" then
+			for k, v in pairs(item) do
+				str ..= csv_print(name.."."..k, v, header, sep)
+			end
+		else
+			str = tostring(item)..sep
+		end
+	end
+	return str
+end
+
+do
+	local debug_queue = {}
+	local can_queue = true
+	
+	function clear_debug()
+		debug_queue={}
+	end
+	
+	function print_debug(s)
+		if (debug_info and can_queue) then
+			local start=1
+			for i=1,#s do
+				if sub(s,i,i) == "\n" then
+					add(debug_queue,sub(s,start,i-1))
+					start=i+1
+				end
+			end
+			add(debug_queue,sub(s,start))
+		end
+	end
+	
+	function lock_debug()
+		can_queue = false
+	end
+	
+	function unlock_debug()
+		can_queue = true
+	end
+	
+	function show_debug()
+		local ln=0
+		cursor(0,65)
+		local i=1
+		while #debug_queue > 0 and i <= #debug_queue do
+			local s = debug_queue[i]
+			if (not fstep) then
+				deli(debug_queue,1)
+			else
+				i += 1
+			end
+			if #s > 16 then
+				add(debug_queue, sub(s,16),i)
+				s=sub(s,1,15).."\\"
+			end
+			color(0)
+			print(s)
+			ln += 1
+			if ln == 9 then
+				cursor(64,1)
+			elseif ln == 28 then
+				if not fstep then
+					debug_queue={}
+				else
+					i=#debug_queue+1
+				end
+			end
+		end
+	end
+end
+
+do
+	local last_time=0
+	function dump_str(t,pa)
+		pa=pa or ""
+		local str = ""
+		local this_time = 1-last_time
+		if (not t.dump_visited) or t.dump_visited != this_time then
+			for k,v in pairs(t) do
+				str ..= pa..k..": "
+				local s = tostr(v)
+				if s == "[table]" or sub(s,1,5) == "table" then
+					str ..="\n"..dump_str(v,"	"..pa)
+				else
+					str ..= s.."\n"
+				end
+			end
+			t.dump_visited = this_time
+		end
+		last_time = this_time
+		return str
+	end
+end
+-->8
+-- platform class
+platform_cls = {
+	x=0,
+	y=0,
+	m=0,
+	l=0,
+	h_light={},
+	h_dark={}
+}
+
+function platform_cls:new(o)
+	o = o or {}
+	self.__index = self
+	setmetatable(o, self)
+	return o
+end
+
+function platform_cls:hyp()
+	return sqrt(1+self.m^2)
+end
+
+function platform_cls:left()
+	return self.x
+end
+
+function platform_cls:width()
+	return self.l/self:hyp()
+end
+
+function platform_cls:height()
+	return self:width()*abs(self.m)
+end
+
+function platform_cls:right()
+	return self.x + self:width()
+end
+
+function platform_cls:bottom()
+	if self.m >= 0 then
+		return self.y
+	else
+		return self.y-self:height()
+	end
+end
+
+function platform_cls:top()
+	if self.m <= 0 then
+		return self.y
+	else
+		return self.y + self:height()
+	end
+end
+
+function platform_cls:setslope(nm)
+	self.m = nm
+end
+
+function platform_cls:setleft(nl)
+	self.x = nl
+end
+
+function platform_cls:setright(nr)
+	self.x = nr - self:width()
+end
+
+function platform_cls:setwidth(nw,keep_side)
+	keep_side=keep_side or "left"
+	local o_r = self:right()
+	self.l = nw*self:hyp()
+	if (keep_side == "right") self:setright(o_r)		
+end
+
+function platform_cls:setbottom(nb)
+	if self.m >= 0 then
+		self.y = nb
+	else
+		self.y = nb+self:height()
+	end
+end
+
+function platform_cls:settop(nt)
+	if self.m <= 0 then
+		self.y = nt
+	else
+		self.y = nb-self:height()
+	end
+end
+
+function platform_cls:gen_h()
+	self.h_light={}
+	self.h_dark={}
+	local icicle_pos=1
+	local tmp=0
+	for i = 0,ceil(self:width()) do
+		if i == icicle_pos-1 then
+			tmp = flr(rnd(2))+1
+			add(self.h_light,tmp)
+			tmp = flr(rnd(3))+1
+			add(self.h_dark,tmp)
+		elseif i == icicle_pos then
+			tmp = flr(rnd(3))+3
+			add(self.h_dark,tmp)
+			tmp = flr(rnd(tmp-1)+1)
+			add(self.h_light,tmp)
+		elseif i == icicle_pos + 1 then
+			tmp = flr(rnd(2))+1
+			add(self.h_light,tmp)
+			tmp = flr(rnd(3))+1
+			add(self.h_dark,tmp)
+			icicle_pos += flr(rnd(5))+3
+		else
+			add(self.h_light,1)
+			add(self.h_dark,0)
+		end
+	end
+end
+-->8
+-- bignum class
 bignum = {}
 function bignum:new(o)
 	if type(o) == "number" then
@@ -1209,222 +1514,6 @@ function make_bn_pair(v1,v2)
 	if (type(v1) != "table") v1=bignum:new(v1)
 	if (type(v2) != "table") v2=bignum:new(v2)
 	return v1,v2
-end
-
-function get_stored_score()
-	local res = bignum:new()
-	if dget(0) > 100 then
-		res.sign = -1
-		res.huns[1] = 200-dget(0)
-	else
-		res.huns[1] = 100-dget(0)
-	end
-	for i=1,63 do
-		if (dget(i) == 0) break
-		res.huns[i+1] = 100-dget(i)
-	end
-	return res
-end
-
-function store_score(s)
-	if s.sign < 0 then
-		dset(0,200-s.huns[1])
-	else
-		dset(0,100-s.huns[1])
-	end
-	for i=1,63 do
-		if s.huns[i+1] then
-			dset(i,100-s.huns[i+1])
-		else
-			dset(i,0)
-		end
-	end
-end
--->8
---lowrez debug functions
-function csv_print_file(file, name, item, header, sep)
- printh(csv_print(name, item, header, sep), file, header)
-end
-
-function csv_print (name, item, header, sep)
-	sep = sep or ","
-	str = ""
-	header = header and name != ""
-	if header then
-		if type(item) == "table" then
-			for k, v in pairs(item) do
-				str ..= csv_print(name.."."..k, v, header, sep)
-			end
-		else
-			str = name..sep
-		end
-	else
-		if type(item) == "table" then
-			for k, v in pairs(item) do
-				str ..= csv_print(name.."."..k, v, header, sep)
-			end
-		else
-			str = tostring(item)..sep
-		end
-	end
-	return str
-end
-
-do
-	local debug_queue = {}
-	
-	function clear_debug()
-		debug_queue={}
-	end
-	
-	function print_debug(s)
-		if (debug_info) add(debug_queue,s)
-	end
-	
-	function show_debug()
-		local ln=0
-		cursor(0,65)
-		local i=1
-		while #debug_queue > 0 and i <= #debug_queue do
-			local s = debug_queue[i]
-			if (not fstep) then
-				deli(debug_queue,1)
-			else
-				i += 1
-			end
-			if #s > 16 then
-				add(debug_queue, sub(s,16),i)
-				s=sub(s,1,15).."\\"
-			end
-			color(0)
-			print(s)
-			ln += 1
-			if ln == 9 then
-				cursor(64,1)
-			elseif ln == 28 then
-				if not fstep then
-					debug_queue={}
-				else
-					i=#debug_queue+1
-				end
-			end
-		end
-	end
-end
--->8
--- platform class
-platform_cls = {
-	x=0,
-	y=0,
-	m=0,
-	l=0,
-	h_light={},
-	h_dark={}
-}
-
-function platform_cls:new(o)
-	o = o or {}
-	self.__index = self
-	setmetatable(o, self)
-	return o
-end
-
-function platform_cls:hyp()
-	return sqrt(1+self.m^2)
-end
-
-function platform_cls:left()
-	return self.x
-end
-
-function platform_cls:width()
-	return self.l/self:hyp()
-end
-
-function platform_cls:height()
-	return self:width()*abs(self.m)
-end
-
-function platform_cls:right()
-	return self.x + self:width()
-end
-
-function platform_cls:bottom()
-	if self.m >= 0 then
-		return self.y
-	else
-		return self.y-self:height()
-	end
-end
-
-function platform_cls:top()
-	if self.m <= 0 then
-		return self.y
-	else
-		return self.y + self:height()
-	end
-end
-
-function platform_cls:setslope(nm)
-	self.m = nm
-end
-
-function platform_cls:setleft(nl)
-	self.x = nl
-end
-
-function platform_cls:setright(nr)
-	self.x = nr - self:width()
-end
-
-function platform_cls:setwidth(nw,keep_side)
-	keep_side=keep_side or "left"
-	local o_r = self:right()
-	self.l = nw*self:hyp()
-	if (keep_side == "right") self:setright(o_r)		
-end
-
-function platform_cls:setbottom(nb)
-	if self.m >= 0 then
-		self.y = nb
-	else
-		self.y = nb+self:height()
-	end
-end
-
-function platform_cls:settop(nt)
-	if self.m <= 0 then
-		self.y = nt
-	else
-		self.y = nb-self:height()
-	end
-end
-
-function platform_cls:gen_h()
-	self.h_light={}
-	self.h_dark={}
-	for i = 0,ceil(self:width()) do
-		local tmp = rnd(10)
-		if tmp < 7 then
-			add(self.h_light,0)
-		elseif tmp < 9 then
-			add(self.h_light,1)
-		else
-			add(self.h_light,2)
-		end
-		tmp=rnd(10)
-		if tmp < 1 then
-			add(self.h_dark,1)
-		elseif tmp < 5 then
-			add(self.h_dark, 2)
-		elseif tmp < 8 then
-			add(self.h_dark, 3)
-		elseif tmp < 9.5 then
-			add(self.h_dark, 4)
-		elseif tmp < 9.8 then
-			add(self.h_dark, 5)
-		end
-	end
 end
 __gfx__
 00055000000344444303ee3000a0000000a0000066666666666666666666666676666666ccccccccccccc7777777777777777ccc000000000000001c0000001c
@@ -1685,11 +1774,11 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 
 __sfx__
-010100003033030330303603036030370300103033030110303303001030320303203000030000300003000030310303100000000000000000000000000000000000000000000000000000000000000000000000
+000100003033030330303603036030370300103033030110303303001030320303203000030000300003000030310303100000000000000000000000000000000000000000000000000000000000000000000000
 000100000064000640007700067000770007200072000730007300073000730007200072000710007100071000710007200072000720007200071000710007100071000710007100071000710007100071000710
 000100003f6433f2433a6433a24334633342232e6102d6102b6102861026610236101e6101b6101761015610136100f6100d61009610056100261000610000000000000000000000000000000000000000000000
 0101060718313183231833318343183531836318371000001465011150101500f150101501215015150191501e15023150281502c1502e1502e15000000000000000000000000000000000000000000000000000
-011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000300002b5602b5602b5602a5502a5502a55029540285402854026540255402454022540205401e5301c5301a53019530175301653015520135201252011520105200f5200e5200e5200d520000000000000000
 002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
