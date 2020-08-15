@@ -63,17 +63,11 @@ function _update60()
 			end
 			check_platforms()
 			check_powerups()
-		elseif gw.mode == "menu" or gw.mode == "over" then
+		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" then
 			update_buttons()
 		end
 	end
 	check_music()
-	print_debug("pl.score: "..type(pl.score))
-	print_debug(tostr(pl.score))
-	print_debug("gw.stored_hs: "..type(gw.stored_hs))
-	print_debug(tostr(gw.stored_hs))
-	print_debug("gw.drawn_score: "..type(gw.drawn_score))
-	print_debug(tostr(gw.drawn_score))
 end
 
 function _draw()
@@ -98,6 +92,9 @@ function _draw()
 		else
 			draw_best_distance()
 		end
+		draw_buttons()
+	elseif gw.mode == "credits" then
+		draw_credits()
 		draw_buttons()
 	end
 	camera(0,0)
@@ -167,7 +164,20 @@ function platform(pt)
 		local x=pt.x+dx
 		local y=flr(pt.y+dx*pt.m)
 		local ax=x+gw.lx
-		pset(ax,gw.by-y+1,12)
+		if pt.h_dark[dx+1] then
+			local i=1
+			while i <= pt.h_dark[dx+1] do
+				pset(ax,gw.by-y+i,5)
+				i += 1
+			end
+			i=1
+			while i <= pt.h_light[dx+1]+1 do
+				pset(ax,gw.by-y+i,12)
+				i += 1
+			end
+		else
+			pset(ax,gw.by-y+1,12)
+		end
 		pset(ax,gw.by-y,7)
 	end
 end
@@ -219,7 +229,7 @@ do
 				end
 			end
 			clip()
-		elseif gw.mode == "menu" or gw.mode == "over" then
+		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" then
 			cls(10)
 		elseif gw.mode == "anim" then
 			if stat(24) > 0 then
@@ -266,19 +276,14 @@ function set_camera()
 end
 
 do
-	local lpos_count=0
 	function draw_logo()
-		lpos_count += 1
-		lpos_count %= 2*stat(8)/3
-		spr(64,11,20+lpos_count\(stat(8)/3),6,4)
+		spr(64,11,20+(stat(26)%128)\64,6,4)
 	end
 	
 	local bpos_count=0
 	function draw_buttons()
 		if not min_t or min_t <= 0 then
-			bpos_count += 1
-			bpos_count %= 2*stat(8)/3
-			local os = bpos_count\(stat(8)/3)
+			local os = (stat(26)%128)\64
 			if gw.selected == 0 then		
 				pal(3,15)
 				palt(3,false)
@@ -408,6 +413,45 @@ function draw_score()
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
  print(gw.drawn_score,5)
+end
+
+function draw_credits()
+	local boxspec = {
+		{4,4,1,1,61,0,0,0},
+		{12,4,1/4,1,62,19,0,0},
+		{52,4,1,1,62,0,0,0},
+		{4,11,1,1,77,0,0,0},
+		{12,11,1/4,1,78,19,0,0},
+		{52,11,1,1,78,0,0,0}
+	}
+	draw_specs(boxspec)
+	local str="art: hannah"
+	cursor(32-#str*2,6)
+	color(5)
+	print(str)
+	str="zaitlin"
+	cursor(32-#str*2,12)
+	print(str)
+	for item in all(boxspec) do
+		item[2] += 15
+	end
+	draw_specs(boxspec)
+	local str="music: jon"
+	cursor(32-#str*2,21)
+	print(str)
+	str="malley"
+	cursor(32-#str*2,27)
+	print(str)
+	for item in all(boxspec) do
+		item[2] += 15
+	end
+	draw_specs(boxspec)
+	local str="code: liam"
+	cursor(32-#str*2,36)
+	print(str)
+	str="wrubleski"
+	cursor(32-#str*2,42)
+	print(str)
 end
 -->8
 --lowrez physics functions
@@ -696,6 +740,7 @@ function init_bg()
 	}
 	bg.spr.anim=bg.spr.menu
 	bg.spr.over=bg.spr.menu
+	bg.spr.credits=bg.spr.menu
 	bg.tiles={}
 	tile_bg(72)
 	bg.offset=0
@@ -726,6 +771,7 @@ function init_br()
  }	
  br.spr.anim=br.spr.menu
  br.spr.over=br.spr.menu
+ br.spr.credits=br.spr.menu
 end
 
 function init_gw()
@@ -799,9 +845,17 @@ function update_buttons()
 	if not min_t or min_t <= 0 then
 		if btnp(0) or btnp(1) then
 			gw.selected = 1-gw.selected
-		elseif (btnp(2) or btnp(4) or btnp(5)) and gw.selected == 0 then	
-			pl.score = 0
-			gw.mode = "game"
+		elseif (btnp(2) or btnp(4) or btnp(5)) then	
+			if gw.selected == 0 then
+				pl.score = 0
+				gw.mode = "game"
+			else
+				if gw.mode == "credits" then
+					gw.mode = "menu"
+				else
+					gw.mode = "credits"
+				end
+			end
 		end
 	end
 	if (min_t and min_t > 0) min_t -= 1
@@ -841,6 +895,7 @@ function check_platforms()
 			hmin = -1
 		end
 		np:setbottom(highest:top()+rnd(10+hmin)-hmin)
+		np:gen_h()
 		highest=np
 		add(gw.platforms,np)
 	end
@@ -1262,7 +1317,9 @@ platform_cls = {
 	x=0,
 	y=0,
 	m=0,
-	l=0
+	l=0,
+	h_light={},
+	h_dark={}
 }
 
 function platform_cls:new(o)
@@ -1340,6 +1397,33 @@ function platform_cls:settop(nt)
 		self.y = nt
 	else
 		self.y = nb-self:height()
+	end
+end
+
+function platform_cls:gen_h()
+	self.h_light={}
+	self.h_dark={}
+	for i = 0,ceil(self:width()) do
+		local tmp = rnd(10)
+		if tmp < 7 then
+			add(self.h_light,0)
+		elseif tmp < 9 then
+			add(self.h_light,1)
+		else
+			add(self.h_light,2)
+		end
+		tmp=rnd(10)
+		if tmp < 1 then
+			add(self.h_dark,1)
+		elseif tmp < 5 then
+			add(self.h_dark, 2)
+		elseif tmp < 8 then
+			add(self.h_dark, 3)
+		elseif tmp < 9.5 then
+			add(self.h_dark, 4)
+		elseif tmp < 9.8 then
+			add(self.h_dark, 5)
+		end
 	end
 end
 __gfx__
