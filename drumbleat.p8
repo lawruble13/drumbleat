@@ -9,7 +9,7 @@ __lua__
 function _init()	
 	-- set me to step thru frames
 	fstep=false
-	debug_info=true
+	debug_info=false
 	record_state=false
 	record_tiles=false
 	general_debug=false
@@ -312,7 +312,7 @@ function draw_final_dist()
 	}
 	draw_specs(boxspec)
 	cursor(16,16)
-	color(1)
+	color(5)
 	print("distance")
 	local score_str=tostr(pl.score)
 	cursor(32-#score_str*2,23)
@@ -326,7 +326,7 @@ function draw_high_score()
 		{52,31,1,1,87,0,0,0}
 	}
 	draw_specs(boxspec)
-	color(1)
+	color(5)
 	cursor(10,33)
 	print("high score!")
 end
@@ -338,7 +338,7 @@ function draw_best_distance()
 		{52,31,1,1,87,0,0,0}
 	}
 	draw_specs(boxspec)
-	color(1)
+	color(5)
 	cursor(12,33)
 	print("prev best:")
 	boxspec = {
@@ -388,7 +388,7 @@ do
 				{54,2,1,7/8,71,0,0,0}
 			}
 			draw_specs(boxspec)
-			color(1)
+			color(5)
 			cursor(32-2*#alert_str,3)
 			print(alert_str)
 			alert_dur -= 1
@@ -404,7 +404,7 @@ function draw_score()
 			gw.drawn_score += 5
 		end
 	end
-	color(1)
+	color(5)
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
  print(gw.drawn_score,5)
