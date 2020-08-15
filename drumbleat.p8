@@ -38,7 +38,7 @@ function _init()
 
 	if (record_state) csv_print_file("state.csv","state",{gw=gw,pl=pl,but=peek(0x5f4c)},true)
 	setpal()
-	music(7)
+	music(0)
 end
 
 function _update60()
