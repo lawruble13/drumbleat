@@ -186,6 +186,24 @@ function draw_specs(specs)
 end
 
 do
+	local snowflakes = {}
+	local d_sf_count = 0
+	function draw_snowfall()
+		if rnd(50) < 1 then
+			add(snowflakes, {x=flr(rnd(64)),y=0})
+		end
+		d_sf_count += 1
+		d_sf_count %= 10
+		for sf in all(snowflakes) do
+			if d_sf_count == 0 then
+				sf.y += 1
+			end
+			pset(sf.x,sf.y,7)
+		end
+	end
+end
+
+do
 	local cam_pos = -1
 	function background()
 		if gw.mode == "game" then
@@ -213,6 +231,7 @@ do
 			camera(0,64*cam_pos)
 		end
 		draw_specs(bg.spr[gw.mode])
+		draw_snowfall()
 	end
 end
 
@@ -293,6 +312,7 @@ function draw_final_dist()
 	}
 	draw_specs(boxspec)
 	cursor(16,16)
+	color(1)
 	print("distance")
 	local score_str=tostr(pl.score)
 	cursor(32-#score_str*2,23)
@@ -306,6 +326,7 @@ function draw_high_score()
 		{52,31,1,1,87,0,0,0}
 	}
 	draw_specs(boxspec)
+	color(1)
 	cursor(10,33)
 	print("high score!")
 end
@@ -317,6 +338,7 @@ function draw_best_distance()
 		{52,31,1,1,87,0,0,0}
 	}
 	draw_specs(boxspec)
+	color(1)
 	cursor(12,33)
 	print("prev best:")
 	boxspec = {
@@ -366,6 +388,7 @@ do
 				{54,2,1,7/8,71,0,0,0}
 			}
 			draw_specs(boxspec)
+			color(1)
 			cursor(32-2*#alert_str,3)
 			print(alert_str)
 			alert_dur -= 1
@@ -381,6 +404,7 @@ function draw_score()
 			gw.drawn_score += 5
 		end
 	end
+	color(1)
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
  print(gw.drawn_score,5)
