@@ -75,6 +75,8 @@ function _update60()
 	dy = pl.y-dy
 	if abs(dy) > 10 then
 		printh(dump_str({pl,gw}))
+		printh(dump_str({pl,gw}),"out.log",true)
+		stop("an error has been encountered. please inform the developer.",0,0)
 	end
 end
 
@@ -309,7 +311,6 @@ do
 		spr(64,11,20+(stat(26)%128)\64,6,4)
 	end
 	
-	local bpos_count=0
 	function draw_buttons()
 		if not min_t or min_t <= 0 then
 			local os = (stat(26)%128)\64
@@ -378,7 +379,7 @@ function draw_final_dist()
 end
 
 function draw_high_score()
-	text_box("high store!",31,true)
+	text_box("high score!",31,true)
 end
 
 function draw_best_distance()
@@ -464,23 +465,25 @@ function draw_instructions()
 		spr(132,41,34,1,1)
 		pal(3,15)
 		palt(3,false)
-		spr(33,26,46,1.5,1.5)
-		spr(52,28,48,1,1)
+		spr(33,26+(stat(26)%128)\64,46,1.5,1.5)
+		spr(52,28+(stat(26)%128)\64,48,1,1)
 	elseif gw.mode == "inst2" then
 		spr(144,gw.lx+1,16,6,5)
 		local str="jump on"
 		cursor(ceil((gw.lx+gw.rx+1)/2)-#str*2,20)
 		color(5)
 		print(str)
-		str="the beat"
-		local cur_x = ceil((gw.lx+gw.rx+1)/2)-(#str+3)*2+1
+		local cur_x = ceil((gw.lx+gw.rx+1)/2)-(11)*2+1
+		cursor(cur_x,28)
+		print("the")
+		cur_x += 15
 		cursor(cur_x,28)
 		local eob=(stat(26)+64)%128
 		if min(eob,128-eob) < 10 then
 			color(15)
 		end
-		print(str)
-		cursor(cur_x+33,28)
+		print("beat")
+		cursor(cur_x+19,28)
 		color(5)
 		print("to")
 		str="go higher"
@@ -488,8 +491,8 @@ function draw_instructions()
 		print(str)
 		pal(3,15)
 		palt(3,false)
-		spr(33,ceil((gw.lx+gw.rx+1)/2)-6,46,1.5,1.5)
-		spr(52,ceil((gw.lx+gw.rx+1)/2)-4,48,1,1)
+		spr(33,ceil((gw.lx+gw.rx+1)/2)-6+(stat(26)%128)\64,46,1.5,1.5)
+		spr(52,ceil((gw.lx+gw.rx+1)/2)-4+(stat(26)%128)\64,48,1,1)
 	end
 end
 -->8
@@ -680,7 +683,7 @@ function update_player_speed()
 	print_debug("jump h: "..jh)
 	if (pl.stn) then
 		local pt = pl.spt
-		local k=1/len(1,pt.m)
+		local k=1/pt:hyp()
 		local v=len(pl.vx,pl.vy)
 		local dv = pt.m
 		if pl.pu and pl.pu.type == 2 then
@@ -733,7 +736,7 @@ function update_player_speed()
 			pl.vx -= max(-0.025,pl.vx)
 		end
 		if (pl.pu and pl.pu.type == 0) then
-			if not pl.doublejump and pl.js then
+			if (not pl.doublejump) and pl.js then
 				if pl.vy < 0 then
 					pl.vy = jh
 				else
@@ -1021,43 +1024,44 @@ do
 	local melody_options={7,11,15,19,23,27,31,39}
 	local choice_nodes={
 		{
-			{pat=7,nxt=1},
-			{pat=11,nxt=1},
-			{pat=15,nxt=2},
-			{pat=27,nxt=1},
-			{pat=31,nxt=2},
+			{pat=7,nxt=1,taken=0},
+			{pat=11,nxt=1,taken=0},
+			{pat=15,nxt=2,taken=0},
+			{pat=27,nxt=1,taken=0},
+			{pat=31,nxt=2,taken=0},
 			last=0
 		},
 		{
-			{pat=20,nxt=1},
-			{pat=32,nxt=3},
-			{pat=36,nxt=3},
+			{pat=20,nxt=1,taken=0},
+			{pat=32,nxt=3,taken=0},
+			{pat=36,nxt=3,taken=0},
 			last=0
 		},
 		{
-			{pat=35,nxt=4},
-			{pat=39,nxt=1},
+			{pat=35,nxt=4,taken=0},
+			{pat=39,nxt=1,taken=0},
 			last=0
 		},
 		{
-			{pat=20,nxt=1},
-			{pat=36,nxt=3},
+			{pat=20,nxt=1,taken=0},
+			{pat=36,nxt=3,taken=0},
 			last=0
 		}
 	}
 	local ncn=choice_nodes[1]
 	function check_music()
 		if stat(24) < 0 then
-			local ind = flr(rnd(#ncn-1))+1
+			local ind = flr(rnd(#ncn))+1
 			if ind == ncn.last then
-				ind = flr(rnd(#ncn-1))+1
+				ind = flr(rnd(#ncn))+1
 			end
 			music(ncn[ind].pat)
+			ncn[ind].taken += 1
 			ncn.last=ind
 			ncn=choice_nodes[ncn[ind].nxt]
 		end
 		for n in all(ncn) do
-			if(type(n) == "table") print_debug("{"..n.pat..","..n.nxt.."}")
+			if(type(n) == "table") print_debug("{"..n.pat..","..n.nxt..","..n.taken.."}")
 		end
 	end
 end
@@ -1863,13 +1867,13 @@ __sfx__
 011000002e2501b3202e2501b3202e2502d2502d2502d2502b2502b2502b2502b2502b250292502925029250272501b320272501b320272502625024250222502125021250212502125021250222502225022250
 0110000024250183202425018320242502325024250252502425024250242502425024250222502225022250212501a320212501a320212501f2501e2501c2501e2501e2501e2501e2501a2501e2501e2501e250
 __music__
-01 094a5044
-01 094a0c54
-01 094a0f4d
-01 094a0c0d
-01 094a0f0e
-01 090b0c0d
-01 090b0f0e
+00 094a5044
+00 094a0c54
+00 094a0f4d
+00 094a0c0d
+00 094a0f0e
+00 090b0c0d
+00 090b0f0e
 01 090b1014
 00 090b1115
 00 090b1216
@@ -1909,5 +1913,5 @@ __music__
 00 090b2014
 00 090b2d15
 00 090b2e16
-00 090b2f17
+02 090b2f17
 
