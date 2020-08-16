@@ -16,6 +16,7 @@ function _init()
 	reset_high_score=false
 	platform_below=false
 	queue_stop=false
+	error_hack=false
 	
 	cartdata("lawruble13_drumbleat_2")
 	if (reset_high_score) then
@@ -44,6 +45,8 @@ function _init()
 end
 
 function _update60()
+	print_debug("mem: "..stat(0))
+	print_debug("fr: "..stat(7))
 	if (queue_stop) stop()
 	local dy = pl.y
 	if record_state then
@@ -71,10 +74,19 @@ function _update60()
 			update_buttons()
 		end
 	end
+	if(abs(dy-pl.y)>10) error(dy)
 	check_music()
-	dy = pl.y-dy
-	if abs(dy) > 10 then
-		printh(dump_str({pl,gw}))
+end
+
+function error(y,after,other)
+	if y and error_hack then
+		pl.y = y
+	elseif not error_hack then
+		if (after) printh("after: "..after)
+		printh(dump_str({pl,gw,other}))
+		printh(dump_str({pl,gw,other}),"out.log",true)
+		if (after) printh("after: "..after,"out.log")
+		stop("an error has been encountered. please inform the developer.",0,0)
 	end
 end
 
@@ -113,6 +125,7 @@ function _draw()
  if debug_info then
 	 show_debug()
  end
+ unlock_debug()
 end
 -->8
 --lowrez drawing functions
@@ -309,7 +322,6 @@ do
 		spr(64,11,20+(stat(26)%128)\64,6,4)
 	end
 	
-	local bpos_count=0
 	function draw_buttons()
 		if not min_t or min_t <= 0 then
 			local os = (stat(26)%128)\64
@@ -378,7 +390,7 @@ function draw_final_dist()
 end
 
 function draw_high_score()
-	text_box("high store!",31,true)
+	text_box("high score!",31,true)
 end
 
 function draw_best_distance()
@@ -430,14 +442,14 @@ function draw_score()
 			gw.drawn_score += 5
 		end
 	end
+	color(5)
+ camera(0,0)
+ cursor(gw.lx+1, gw.ty+1)
+ print(tostr(gw.drawn_score))
 	if pl.score > gw.stored_hs and gw.mode == "game" and not gw.nhs then
 		alert("high score!")
 		gw.nhs=true
 	end
-	color(5)
- camera(0,0)
- cursor(gw.lx+1, gw.ty+1)
- print(gw.drawn_score,5)
 end
 
 function draw_credits()
@@ -464,23 +476,25 @@ function draw_instructions()
 		spr(132,41,34,1,1)
 		pal(3,15)
 		palt(3,false)
-		spr(33,26,46,1.5,1.5)
-		spr(52,28,48,1,1)
+		spr(33,26+(stat(26)%128)\64,46,1.5,1.5)
+		spr(52,28+(stat(26)%128)\64,48,1,1)
 	elseif gw.mode == "inst2" then
 		spr(144,gw.lx+1,16,6,5)
 		local str="jump on"
 		cursor(ceil((gw.lx+gw.rx+1)/2)-#str*2,20)
 		color(5)
 		print(str)
-		str="the beat"
-		local cur_x = ceil((gw.lx+gw.rx+1)/2)-(#str+3)*2+1
+		local cur_x = ceil((gw.lx+gw.rx+1)/2)-(11)*2+1
+		cursor(cur_x,28)
+		print("the")
+		cur_x += 15
 		cursor(cur_x,28)
 		local eob=(stat(26)+64)%128
 		if min(eob,128-eob) < 10 then
 			color(15)
 		end
-		print(str)
-		cursor(cur_x+33,28)
+		print("beat")
+		cursor(cur_x+19,28)
 		color(5)
 		print("to")
 		str="go higher"
@@ -488,21 +502,23 @@ function draw_instructions()
 		print(str)
 		pal(3,15)
 		palt(3,false)
-		spr(33,ceil((gw.lx+gw.rx+1)/2)-6,46,1.5,1.5)
-		spr(52,ceil((gw.lx+gw.rx+1)/2)-4,48,1,1)
+		spr(33,ceil((gw.lx+gw.rx+1)/2)-6+(stat(26)%128)\64,46,1.5,1.5)
+		spr(52,ceil((gw.lx+gw.rx+1)/2)-4+(stat(26)%128)\64,48,1,1)
 	end
 end
 -->8
 --lowrez physics functions
 function move_player()
 	local n_steps=8
+	local str=""
+	local start_y=pl.y
 	for i=1,n_steps do
+		str="loop "..i.."\n"
 		local wall = true
 		local _pt = nil
 		local bc = wall_collide()
 		local active_x = 0
 		for pt in all(gw.platforms) do
-			local coll = false
 			for offset in all(pl.offsets) do
 				local os_x = pl.x-pl.w/2
 				if pl.fl then
@@ -518,6 +534,7 @@ function move_player()
 				end
 			end
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "pt_collide "..str)
 		for pu in all(gw.powerups) do
 			local w=pu.w1
 			local h=pu.h1
@@ -538,6 +555,7 @@ function move_player()
 				end
 			end
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "pu_collide "..str)
 		if bc <= 1/n_steps then
 			pl.x += bc*pl.vx
 			pl.y += bc*pl.vy
@@ -553,7 +571,6 @@ function move_player()
 				local k = dot(pl.vx,pl.vy,1,m)/dot(1,m,1,m)
 				pl.vx = k
 				pl.vy = k*m
-				printh("in col, b4 clip")
 				pl.y=_pt.y+m*(pl.x-_pt.x)
 				pl.spt=_pt
 			end
@@ -561,6 +578,7 @@ function move_player()
 			pl.x += pl.vx/n_steps
 			pl.y += pl.vy/n_steps
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "moving if "..str,{_pt=_pt,wall=wall,bc=bc})
 	end
 	local pt=pl.spt
 	if pt then
@@ -574,7 +592,6 @@ function move_player()
 			local os_y = pl.y+pt.m*(os_x-pl.x)
 			if on_floor(pt,os_x,os_y) then
 				pl.stn=true
-				printh("in c2flr b4 clip")
 				pl.y=pt.y+pt.m*(pl.x-pt.x)
 				return
 			end
@@ -582,6 +599,7 @@ function move_player()
 		pl.stn=false
 		pl.spt=nil
 	end
+	if (abs(start_y-pl.y)>10) error(start_y, "floor clip "..str)
 end
 
 function on_floor(pt,x,y)
@@ -596,6 +614,7 @@ end
 
 function wall_collide()
  --check left wall collision
+ if (pl.vx == 0) return 1
  d=gw.lx-pleft() -- < 0
  if d > pl.vx then
  	return d/pl.vx
@@ -680,7 +699,7 @@ function update_player_speed()
 	print_debug("jump h: "..jh)
 	if (pl.stn) then
 		local pt = pl.spt
-		local k=1/len(1,pt.m)
+		local k=1/pt:hyp()
 		local v=len(pl.vx,pl.vy)
 		local dv = pt.m
 		if pl.pu and pl.pu.type == 2 then
@@ -733,7 +752,7 @@ function update_player_speed()
 			pl.vx -= max(-0.025,pl.vx)
 		end
 		if (pl.pu and pl.pu.type == 0) then
-			if not pl.doublejump and pl.js then
+			if (not pl.doublejump) and pl.js then
 				if pl.vy < 0 then
 					pl.vy = jh
 				else
@@ -973,7 +992,7 @@ function check_powerups()
 	local cty = gw.cy+gw.by-gw.ty+1
 	if gw.npu < cty+10 then
 		local rvd = 128
-		local cy = bignum:new(gw.offset)+gw.cy
+		local cy = bignum:new(gw.cy)+gw.offset
 		while (cy > 0) do
 			cy -= 2000
 			if (rvd*2 < 10000) then
@@ -1021,43 +1040,44 @@ do
 	local melody_options={7,11,15,19,23,27,31,39}
 	local choice_nodes={
 		{
-			{pat=7,nxt=1},
-			{pat=11,nxt=1},
-			{pat=15,nxt=2},
-			{pat=27,nxt=1},
-			{pat=31,nxt=2},
+			{pat=7,nxt=1,taken=0},
+			{pat=11,nxt=1,taken=0},
+			{pat=15,nxt=2,taken=0},
+			{pat=27,nxt=1,taken=0},
+			{pat=31,nxt=2,taken=0},
 			last=0
 		},
 		{
-			{pat=20,nxt=1},
-			{pat=32,nxt=3},
-			{pat=36,nxt=3},
+			{pat=20,nxt=1,taken=0},
+			{pat=32,nxt=3,taken=0},
+			{pat=36,nxt=3,taken=0},
 			last=0
 		},
 		{
-			{pat=35,nxt=4},
-			{pat=39,nxt=1},
+			{pat=35,nxt=4,taken=0},
+			{pat=39,nxt=1,taken=0},
 			last=0
 		},
 		{
-			{pat=20,nxt=1},
-			{pat=36,nxt=3},
+			{pat=20,nxt=1,taken=0},
+			{pat=36,nxt=3,taken=0},
 			last=0
 		}
 	}
 	local ncn=choice_nodes[1]
 	function check_music()
 		if stat(24) < 0 then
-			local ind = flr(rnd(#ncn-1))+1
+			local ind = flr(rnd(#ncn))+1
 			if ind == ncn.last then
-				ind = flr(rnd(#ncn-1))+1
+				ind = flr(rnd(#ncn))+1
 			end
 			music(ncn[ind].pat)
+			ncn[ind].taken += 1
 			ncn.last=ind
 			ncn=choice_nodes[ncn[ind].nxt]
 		end
 		for n in all(ncn) do
-			if(type(n) == "table") print_debug("{"..n.pat..","..n.nxt.."}")
+			if(type(n) == "table") print_debug("{"..n.pat..","..n.nxt..","..n.taken.."}")
 		end
 	end
 end
@@ -1863,13 +1883,13 @@ __sfx__
 011000002e2501b3202e2501b3202e2502d2502d2502d2502b2502b2502b2502b2502b250292502925029250272501b320272501b320272502625024250222502125021250212502125021250222502225022250
 0110000024250183202425018320242502325024250252502425024250242502425024250222502225022250212501a320212501a320212501f2501e2501c2501e2501e2501e2501e2501a2501e2501e2501e250
 __music__
-01 094a5044
-01 094a0c54
-01 094a0f4d
-01 094a0c0d
-01 094a0f0e
-01 090b0c0d
-01 090b0f0e
+00 094a5044
+00 094a0c54
+00 094a0f4d
+00 094a0c0d
+00 094a0f0e
+00 090b0c0d
+00 090b0f0e
 01 090b1014
 00 090b1115
 00 090b1216
@@ -1909,5 +1929,5 @@ __music__
 00 090b2014
 00 090b2d15
 00 090b2e16
-00 090b2f17
+02 090b2f17
 
