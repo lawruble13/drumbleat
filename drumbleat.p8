@@ -16,7 +16,7 @@ function _init()
 	reset_high_score=false
 	platform_below=false
 	queue_stop=false
-	error_hack=true
+	error_hack=false
 	
 	cartdata("lawruble13_drumbleat_2")
 	if (reset_high_score) then
@@ -45,6 +45,8 @@ function _init()
 end
 
 function _update60()
+	print_debug("mem: "..stat(0))
+	print_debug("fr: "..stat(7))
 	if (queue_stop) stop()
 	local dy = pl.y
 	if record_state then
@@ -62,31 +64,28 @@ function _update60()
 				pl.jh=false
 			end
 			update_player_speed()
-			if (abs(pl.y-dy)>10) error(pl.y)
 			move_player()
-			if (abs(pl.y-dy)>10) error(pl.y)
 			if platform_below then
 				gw.platforms[1].y=gw.cy-1
 			end
 			check_platforms()
-			if (abs(pl.y-dy)>10) error(pl.y)
 			check_powerups()
-			if (abs(pl.y-dy)>10) error(pl.y)
 		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" or gw.mode == "inst1" or gw.mode == "inst2" then
 			update_buttons()
-			if (abs(pl.y-dy)>10) error(pl.y)
 		end
 	end
+	if(abs(dy-pl.y)>10) error(dy)
 	check_music()
-	if (abs(pl.y-dy)>10) error(pl.y)
 end
 
-function error(y)
-	printh(dump_str({pl,gw}))
-	printh(dump_str({pl,gw}),"out.log",true)
+function error(y,after,other)
 	if y and error_hack then
 		pl.y = y
-	else
+	elseif not error_hack then
+		if (after) printh("after: "..after)
+		printh(dump_str({pl,gw,other}))
+		printh(dump_str({pl,gw,other}),"out.log",true)
+		if (after) printh("after: "..after,"out.log")
 		stop("an error has been encountered. please inform the developer.",0,0)
 	end
 end
@@ -126,6 +125,7 @@ function _draw()
  if debug_info then
 	 show_debug()
  end
+ unlock_debug()
 end
 -->8
 --lowrez drawing functions
@@ -442,14 +442,14 @@ function draw_score()
 			gw.drawn_score += 5
 		end
 	end
-	if pl.score > gw.stored_hs and gw.mode == "game" and not gw.nhs then
-		alert("high score!")
-		gw.nhs=true
-	end
 	color(5)
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
  print(tostr(gw.drawn_score))
+	if pl.score > gw.stored_hs and gw.mode == "game" and not gw.nhs then
+		alert("high score!")
+		gw.nhs=true
+	end
 end
 
 function draw_credits()
@@ -510,13 +510,15 @@ end
 --lowrez physics functions
 function move_player()
 	local n_steps=8
+	local str=""
+	local start_y=pl.y
 	for i=1,n_steps do
+		str="loop "..i.."\n"
 		local wall = true
 		local _pt = nil
 		local bc = wall_collide()
 		local active_x = 0
 		for pt in all(gw.platforms) do
-			local coll = false
 			for offset in all(pl.offsets) do
 				local os_x = pl.x-pl.w/2
 				if pl.fl then
@@ -532,6 +534,7 @@ function move_player()
 				end
 			end
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "pt_collide "..str)
 		for pu in all(gw.powerups) do
 			local w=pu.w1
 			local h=pu.h1
@@ -552,6 +555,7 @@ function move_player()
 				end
 			end
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "pu_collide "..str)
 		if bc <= 1/n_steps then
 			pl.x += bc*pl.vx
 			pl.y += bc*pl.vy
@@ -567,7 +571,6 @@ function move_player()
 				local k = dot(pl.vx,pl.vy,1,m)/dot(1,m,1,m)
 				pl.vx = k
 				pl.vy = k*m
-				printh("in col, b4 clip")
 				pl.y=_pt.y+m*(pl.x-_pt.x)
 				pl.spt=_pt
 			end
@@ -575,6 +578,7 @@ function move_player()
 			pl.x += pl.vx/n_steps
 			pl.y += pl.vy/n_steps
 		end
+		if (abs(start_y-pl.y)>10) error(start_y, "moving if "..str,{_pt=_pt,wall=wall,bc=bc})
 	end
 	local pt=pl.spt
 	if pt then
@@ -588,7 +592,6 @@ function move_player()
 			local os_y = pl.y+pt.m*(os_x-pl.x)
 			if on_floor(pt,os_x,os_y) then
 				pl.stn=true
-				printh("in c2flr b4 clip")
 				pl.y=pt.y+pt.m*(pl.x-pt.x)
 				return
 			end
@@ -596,6 +599,7 @@ function move_player()
 		pl.stn=false
 		pl.spt=nil
 	end
+	if (abs(start_y-pl.y)>10) error(start_y, "floor clip "..str)
 end
 
 function on_floor(pt,x,y)
@@ -610,6 +614,7 @@ end
 
 function wall_collide()
  --check left wall collision
+ if (pl.vx == 0) return 1
  d=gw.lx-pleft() -- < 0
  if d > pl.vx then
  	return d/pl.vx
@@ -987,7 +992,7 @@ function check_powerups()
 	local cty = gw.cy+gw.by-gw.ty+1
 	if gw.npu < cty+10 then
 		local rvd = 128
-		local cy = bignum:new(gw.offset)+gw.cy
+		local cy = bignum:new(gw.cy)+gw.offset
 		while (cy > 0) do
 			cy -= 2000
 			if (rvd*2 < 10000) then
