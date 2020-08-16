@@ -16,6 +16,7 @@ function _init()
 	reset_high_score=false
 	platform_below=false
 	queue_stop=false
+	error_hack=true
 	
 	cartdata("lawruble13_drumbleat_2")
 	if (reset_high_score) then
@@ -61,21 +62,31 @@ function _update60()
 				pl.jh=false
 			end
 			update_player_speed()
+			if (abs(pl.y-dy)>10) error(pl.y)
 			move_player()
+			if (abs(pl.y-dy)>10) error(pl.y)
 			if platform_below then
 				gw.platforms[1].y=gw.cy-1
 			end
 			check_platforms()
+			if (abs(pl.y-dy)>10) error(pl.y)
 			check_powerups()
+			if (abs(pl.y-dy)>10) error(pl.y)
 		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" or gw.mode == "inst1" or gw.mode == "inst2" then
 			update_buttons()
+			if (abs(pl.y-dy)>10) error(pl.y)
 		end
 	end
 	check_music()
-	dy = pl.y-dy
-	if abs(dy) > 10 then
-		printh(dump_str({pl,gw}))
-		printh(dump_str({pl,gw}),"out.log",true)
+	if (abs(pl.y-dy)>10) error(pl.y)
+end
+
+function error(y)
+	printh(dump_str({pl,gw}))
+	printh(dump_str({pl,gw}),"out.log",true)
+	if y and error_hack then
+		pl.y = y
+	else
 		stop("an error has been encountered. please inform the developer.",0,0)
 	end
 end
@@ -438,7 +449,7 @@ function draw_score()
 	color(5)
  camera(0,0)
  cursor(gw.lx+1, gw.ty+1)
- print(gw.drawn_score,5)
+ print(tostr(gw.drawn_score))
 end
 
 function draw_credits()
