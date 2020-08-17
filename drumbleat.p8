@@ -16,7 +16,7 @@ function _init()
 	reset_high_score=false
 	platform_below=false
 	queue_stop=false
-	error_hack=false
+	error_hack=true
 	
 	cartdata("lawruble13_drumbleat_2")
 	if (reset_high_score) then
@@ -76,6 +76,7 @@ function _update60()
 	end
 	if(abs(dy-pl.y)>10) error(dy)
 	check_music()
+	
 end
 
 function error(y,after,other)
@@ -125,7 +126,6 @@ function _draw()
  if debug_info then
 	 show_debug()
  end
- unlock_debug()
 end
 -->8
 --lowrez drawing functions
@@ -248,15 +248,23 @@ do
 	local cam_pos = -1
 	local last_mul = 0
 	function background()
+		local last=0
 		if gw.mode == "game" or gw.mode == "inst2" then
 			cls(6)
 			clip(gw.lx,gw.ty,gw.rx-gw.lx,gw.by-gw.ty)
+		 print_debug("cpu b0: "..(stat(1)-last))
+		 last=stat(1)
 			if bg.tiles then
 				if last_mul < gw.cy\16 then
 					tile_bg(4)
 					last_mul = gw.cy\16
 				end
+			 print_debug("cpu b1: "..(stat(1)-last))
+			 last=stat(1)
 				local y_off = flr(gw.cy)%16
+			 print_debug("cpu b2: "..(stat(1)-last))
+			 last=stat(1)
+				print_debug("# tiles: "..#bg.tiles)
 				for i, c in ipairs(bg.tiles) do
 					if c>0 then
 						local n=5+2*(c%2)+32*(c\2)
@@ -264,6 +272,8 @@ do
 						spr(n,16*(t%4),16*(t\4)-16+y_off,2,2)
 					end
 				end
+			 print_debug("cpu b3: "..(stat(1)-last))
+			 last=stat(1)
 			end
 			clip()
 		elseif gw.mode == "menu" or gw.mode == "over" or gw.mode == "credits" or gw.mode == "inst1" then
@@ -277,8 +287,14 @@ do
 			
 			camera(0,64*cam_pos)
 		end
+	 print_debug("cpu b4: "..(stat(1)-last))
+	 last=stat(1)
 		draw_specs(bg.spr[gw.mode])
+	 print_debug("cpu b5: "..(stat(1)-last))
+	 last=stat(1)
 		if (gw.mode != "intro") draw_snowfall()
+ print_debug("cpu b6: "..(stat(1)-last))
+ last=stat(1)
 	end
 	
 	function reset_tiles()
@@ -517,6 +533,7 @@ function move_player()
 		local wall = true
 		local _pt = nil
 		local bc = wall_collide()
+		if (bc<0) bc=0
 		local active_x = 0
 		for pt in all(gw.platforms) do
 			for offset in all(pl.offsets) do
@@ -896,7 +913,7 @@ function tile_bg(n,ml)
 		add(bg.tiles,r,1)
 	end
 	
-	while #bg.tiles < ml do
+	while #bg.tiles > ml do
 		deli(bg.tiles,#bg.tiles)
 	end
 	
@@ -1040,27 +1057,27 @@ do
 	local melody_options={7,11,15,19,23,27,31,39}
 	local choice_nodes={
 		{
-			{pat=7,nxt=1,taken=0},
-			{pat=11,nxt=1,taken=0},
-			{pat=15,nxt=2,taken=0},
-			{pat=27,nxt=1,taken=0},
-			{pat=31,nxt=2,taken=0},
+			{pat=7,nxt=1},
+			{pat=11,nxt=1},
+			{pat=15,nxt=2},
+			{pat=27,nxt=1},
+			{pat=31,nxt=2},
 			last=0
 		},
 		{
-			{pat=20,nxt=1,taken=0},
-			{pat=32,nxt=3,taken=0},
-			{pat=36,nxt=3,taken=0},
+			{pat=20,nxt=1},
+			{pat=32,nxt=3},
+			{pat=36,nxt=3},
 			last=0
 		},
 		{
-			{pat=35,nxt=4,taken=0},
-			{pat=39,nxt=1,taken=0},
+			{pat=35,nxt=4},
+			{pat=39,nxt=1},
 			last=0
 		},
 		{
-			{pat=20,nxt=1,taken=0},
-			{pat=36,nxt=3,taken=0},
+			{pat=20,nxt=1},
+			{pat=36,nxt=3},
 			last=0
 		}
 	}
@@ -1072,12 +1089,8 @@ do
 				ind = flr(rnd(#ncn))+1
 			end
 			music(ncn[ind].pat)
-			ncn[ind].taken += 1
 			ncn.last=ind
 			ncn=choice_nodes[ncn[ind].nxt]
-		end
-		for n in all(ncn) do
-			if(type(n) == "table") print_debug("{"..n.pat..","..n.nxt..","..n.taken.."}")
 		end
 	end
 end
